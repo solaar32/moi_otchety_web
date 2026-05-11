@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
+import { prisma } from '@/lib/prisma';
+import { getCurrentUser } from '@/lib/current-user';
 
 function asNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -33,6 +35,10 @@ function parseDecorative(rows: unknown[][]) {
 
 export async function POST(request: Request) {
   try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 });
+    if (user.role !== 'admin') return NextResponse.json({ error: 'Нет доступа' }, { status: 403 });
+
     const form = await request.formData();
     const file = form.get('file');
     if (!(file instanceof File)) {
@@ -47,6 +53,25 @@ export async function POST(request: Request) {
       const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null });
       const items = sheetName === 'Декоративка' ? parseDecorative(rows) : parseRegularSheet(rows);
       return { name: sheetName, items };
+    }).filter((section) => section.items.length > 0);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.reportItem.deleteMany();
+      await tx.report.deleteMany();
+      await tx.priceItem.deleteMany();
+      await tx.category.deleteMany();
+
+      for (const section of sections) {
+        const category = await tx.category.create({ data: { name: section.name } });
+        await tx.priceItem.createMany({
+          data: section.items.map((item) => ({
+            categoryId: category.id,
+            name: item.name,
+            unit: item.unit || 'шт.',
+            price: item.priceWorker ?? 0,
+          })),
+        });
+      }
     });
 
     return NextResponse.json({ sections });

@@ -1,13 +1,22 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { RequireUser } from '@/components/RequireUser';
-import { demoReports, demoUsers } from '@/lib/demo-data';
+import type { ReportItem } from '@/lib/types';
 
 export default function AdminPage() {
-  const total = demoReports.reduce((acc, r) => acc + r.total, 0);
-  const workersCount = demoUsers.filter((u) => u.role === 'worker').length;
+  const [rows, setRows] = useState<ReportItem[]>([]);
+
+  useEffect(() => {
+    fetch('/api/reports')
+      .then((r) => r.json())
+      .then((j) => setRows(j.items ?? []));
+  }, []);
+
+  const total = rows.reduce((acc, r) => acc + r.total, 0);
+  const workersCount = useMemo(() => new Set(rows.map((r) => r.workerName)).size, [rows]);
 
   return (
     <RequireUser role="admin">
@@ -15,16 +24,16 @@ export default function AdminPage() {
         <AppShell title="Панель работодателя" role="Работодатель">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="card p-4">
-              <div className="text-sm text-slate-500">Сумма в демо-отчетах</div>
+              <div className="text-sm text-slate-500">Сумма в отчетах</div>
               <div className="mt-2 text-3xl font-bold">{total.toFixed(2)}</div>
             </div>
             <div className="card p-4">
-              <div className="text-sm text-slate-500">Работников</div>
+              <div className="text-sm text-slate-500">Работников с отчетами</div>
               <div className="mt-2 text-3xl font-bold">{workersCount}</div>
             </div>
             <div className="card p-4">
               <div className="text-sm text-slate-500">Операций</div>
-              <div className="mt-2 text-3xl font-bold">{demoReports.length}</div>
+              <div className="mt-2 text-3xl font-bold">{rows.length}</div>
             </div>
           </div>
 
