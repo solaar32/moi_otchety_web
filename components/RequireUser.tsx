@@ -7,21 +7,34 @@ import type { Role, User } from '@/lib/types';
 export function RequireUser({ role, children }: { role: Role; children: (user: User) => React.ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const raw = localStorage.getItem('moi_otchety_user');
-    if (!raw) {
-      router.push('/');
-      return;
+    let alive = true;
+
+    async function load() {
+      const res = await fetch('/api/me', { cache: 'no-store' });
+      if (!alive) return;
+      if (!res.ok) {
+        router.push('/');
+        return;
+      }
+      const json = await res.json();
+      const current = json.user as User;
+      if (current.role !== role) {
+        router.push(current.role === 'admin' ? '/admin' : '/worker');
+        return;
+      }
+      setUser(current);
+      setLoading(false);
     }
-    const parsed = JSON.parse(raw) as User;
-    if (parsed.role !== role) {
-      router.push(parsed.role === 'admin' ? '/admin' : '/worker');
-      return;
-    }
-    setUser(parsed);
+
+    load();
+    return () => {
+      alive = false;
+    };
   }, [router, role]);
 
-  if (!user) return <div className="p-6">Загрузка...</div>;
+  if (loading || !user) return <div className="p-6">Загрузка...</div>;
   return <>{children(user)}</>;
 }

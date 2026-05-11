@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Worker {
+  id        Int       @id @default(autoincrement())
+  login     String    @unique
+  password  String
+  fullName  String
+  role      Role      @default(WORKER)
+  active    Boolean   @default(true)
+  reports   Report[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Category {
+  id        Int         @id @default(autoincrement())
+  name      String      @unique
+  items     PriceItem[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model PriceItem {
+  id          Int          @id @default(autoincrement())
+  categoryId  Int
+  category    Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  name        String
+  unit        String
+  price       Float
+
+  reportItems ReportItem[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Report {
+  id          Int          @id @default(autoincrement())
+  workerId    Int
+  worker      Worker       @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  orderNumber String
+  workDate    DateTime
+  total       Float        @default(0)
+  items       ReportItem[]
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model ReportItem {
+  id          Int        @id @default(autoincrement())
+
+  reportId    Int
+  report      Report     @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  priceItemId Int
+  priceItem   PriceItem  @relation(fields: [priceItemId], references: [id])
+
+  quantity    Float
+  price       Float
+  total       Float
+  createdAt   DateTime   @default(now())
+}
+
+enum Role {
+  ADMIN
+  WORKER
+}

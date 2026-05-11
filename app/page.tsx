@@ -1,27 +1,35 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { demoPasswords, demoUsers } from '@/lib/demo-data';
 
 export default function LoginPage() {
   const router = useRouter();
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const users = useMemo(() => demoUsers, []);
-
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const user = users.find((u) => u.login.toLowerCase() === login.trim().toLowerCase());
-    if (!user || demoPasswords[user.login] !== password) {
-      setError('Неверный логин или пароль');
+    setError('');
+    setLoading(true);
+
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login, password }),
+    });
+
+    const json = await res.json().catch(() => null);
+    setLoading(false);
+
+    if (!res.ok) {
+      setError(json?.error ?? 'Ошибка входа');
       return;
     }
 
-    localStorage.setItem('moi_otchety_user', JSON.stringify(user));
-    router.push(user.role === 'admin' ? '/admin' : '/worker');
+    router.push(json.user.role === 'admin' ? '/admin' : '/worker');
   }
 
   return (
@@ -45,10 +53,12 @@ export default function LoginPage() {
 
         {error && <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
-        <button className="btn-primary w-full" type="submit">Войти</button>
+        <button className="btn-primary w-full disabled:opacity-50" type="submit" disabled={loading}>
+          {loading ? 'Вход...' : 'Войти'}
+        </button>
 
         <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
-          <b>Демо:</b> admin / admin123 или Иванов / 123456
+          <b>Первый вход:</b> admin / admin123 или Иванов / 123456
         </div>
       </form>
     </main>

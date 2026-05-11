@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "seed": "node prisma/seed.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.87.1",
@@ -17,7 +18,8 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "xlsx": "^0.18.5",
-    "zod": "^4.2.1"
+    "zod": "^4.2.1",
+    "@prisma/client": "^6.19.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
@@ -25,6 +27,7 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "tailwindcss": "^4.1.18",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "prisma": "^6.19.3"
   }
 }

@@ -6,8 +6,8 @@ import { LogOut } from 'lucide-react';
 export function AppShell({ title, role, children }: { title: string; role: string; children: React.ReactNode }) {
   const router = useRouter();
 
-  function logout() {
-    localStorage.removeItem('moi_otchety_user');
+  async function logout() {
+    await fetch('/api/logout', { method: 'POST' });
     router.push('/');
   }
 
