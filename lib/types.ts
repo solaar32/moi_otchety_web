@@ -27,6 +27,7 @@ export type PriceItem = {
 
 export type ReportItem = {
   id: string;
+  reportId?: string;
   reportDate: string;
   workerName: string;
   orderNo: string;
@@ -36,4 +37,6 @@ export type ReportItem = {
   qty: number;
   price: number;
   total: number;
+  customerPrice?: number | null;
+  customerTotal?: number | null;
 };

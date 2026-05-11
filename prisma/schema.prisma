@@ -78,6 +78,16 @@ model ReportItem {
   createdAt     DateTime   @default(now())
 }
 
+model PriceImport {
+  id            Int      @id @default(autoincrement())
+  fileName      String
+  version       String
+  sectionsCount Int      @default(0)
+  itemsCount    Int      @default(0)
+  uploadedBy    String?
+  uploadedAt    DateTime @default(now())
+}
+
 enum Role {
   ADMIN
   WORKER

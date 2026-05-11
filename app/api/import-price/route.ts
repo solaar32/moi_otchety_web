@@ -257,7 +257,10 @@ export async function POST(request: Request) {
       return { name: sheetName, items };
     });
 
-    await prisma.$transaction(async (tx) => {
+    const totalItems = sections.reduce((sum, section) => sum + section.items.length, 0);
+    const version = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
+
+    const priceImport = await prisma.$transaction(async (tx) => {
       await tx.reportItem.deleteMany();
       await tx.report.deleteMany();
       await tx.priceItem.deleteMany();
@@ -280,10 +283,20 @@ export async function POST(request: Request) {
           });
         }
       }
+
+      return tx.priceImport.create({
+        data: {
+          fileName: file.name,
+          version,
+          sectionsCount: sections.length,
+          itemsCount: totalItems,
+          uploadedBy: user.login,
+        },
+      });
     });
 
     console.log('PRICE_IMPORT', sections.map((s) => `${s.name}: ${s.items.length}`).join(' | '));
-    return NextResponse.json({ sections });
+    return NextResponse.json({ sections, priceImport });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Ошибка импорта' }, { status: 500 });

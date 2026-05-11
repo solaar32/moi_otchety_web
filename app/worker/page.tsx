@@ -1,4 +1,4 @@
-use client';
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
@@ -29,6 +29,15 @@ const operationLabels: Record<OperationType, string> = {
   cut: 'Резка',
   polish: 'Полировка',
 };
+
+function monthKey(date: string) {
+  return date.slice(0, 7);
+}
+
+function monthLabel(key: string) {
+  const [year, month] = key.split('-');
+  return `${month}.${year}`;
+}
 
 export default function WorkerPage() {
   return (
@@ -76,10 +85,7 @@ function WorkerHome({ userName }: { userName: string }) {
 
   const selectedSection = categories.find((s) => s.id === sectionId);
   const isDecorative = selectedSection?.name.trim().toLowerCase() === 'декоративка';
-  const sectionItems = useMemo(
-    () => selectedSection?.items ?? [],
-    [selectedSection]
-  );
+  const sectionItems = useMemo(() => selectedSection?.items ?? [], [selectedSection]);
   const selectedItem = sectionItems.find((p) => p.id === priceItemId);
 
   const availableOperations = useMemo(() => {
@@ -151,11 +157,57 @@ function WorkerHome({ userName }: { userName: string }) {
     await loadData();
   }
 
+  async function deleteRow(item: ReportItem) {
+    if (!confirm('Удалить операцию?')) return;
+    const res = await fetch(`/api/reports/${item.id}`, { method: 'DELETE' });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      setError(json?.error ?? 'Ошибка удаления');
+      return;
+    }
+    await loadData();
+  }
+
+  async function editRow(item: ReportItem) {
+    const newOrder = prompt('Номер заказа', item.orderNo);
+    if (newOrder === null) return;
+    const newQty = prompt('Объем', String(item.qty).replace('.', ','));
+    if (newQty === null) return;
+    const res = await fetch(`/api/reports/${item.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderNumber: newOrder, quantity: newQty }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      setError(json?.error ?? 'Ошибка изменения');
+      return;
+    }
+    await loadData();
+  }
+
   function chooseSection(id: string) {
     setSectionId(id);
     setPriceItemId('');
     setOperationType('cutPolish');
   }
+
+  const totalMonth = rows
+    .filter((row) => monthKey(row.reportDate) === monthKey(new Date().toISOString().slice(0, 10)))
+    .reduce((acc, row) => acc + row.total, 0);
+  const totalAll = rows.reduce((acc, row) => acc + row.total, 0);
+
+  const grouped = useMemo(() => {
+    const byMonth = new Map<string, Map<string, ReportItem[]>>();
+    for (const row of rows) {
+      const m = monthKey(row.reportDate);
+      if (!byMonth.has(m)) byMonth.set(m, new Map());
+      const days = byMonth.get(m)!;
+      if (!days.has(row.reportDate)) days.set(row.reportDate, []);
+      days.get(row.reportDate)!.push(row);
+    }
+    return Array.from(byMonth.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [rows]);
 
   return (
     <AppShell title="Мои отчеты" role={`Работник: ${userName}`}>
@@ -197,9 +249,6 @@ function WorkerHome({ userName }: { userName: string }) {
                 </option>
               ))}
             </select>
-            {selectedSection && sectionItems.length === 0 && (
-              <span className="text-xs text-red-600">В этом разделе пока нет импортированных операций</span>
-            )}
           </label>
           {isDecorative && selectedItem && (
             <label className="block space-y-1">
@@ -211,9 +260,6 @@ function WorkerHome({ userName }: { userName: string }) {
                   </option>
                 ))}
               </select>
-              {availableOperations.length === 0 && (
-                <span className="text-xs text-red-600">Для этой операции нет цен резки/полировки</span>
-              )}
             </label>
           )}
           <label className="block space-y-1">
@@ -228,9 +274,6 @@ function WorkerHome({ userName }: { userName: string }) {
             <div className="rounded-xl bg-slate-50 p-3 text-sm space-y-1">
               <div>Ед. изм.: <b>{selectedItem.unit}</b></div>
               <div>Цена работника: <b>{selectedPrice ?? '-'}</b></div>
-              {selectedItem.priceCustomer !== null && selectedItem.priceCustomer !== undefined && (
-                <div>Цена заказчика: <b>{selectedItem.priceCustomer}</b></div>
-              )}
               <div>Итого работнику: <b>{previewTotal.toFixed(2)}</b></div>
             </div>
           )}
@@ -240,8 +283,44 @@ function WorkerHome({ userName }: { userName: string }) {
         </section>
 
         <section className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="card p-4">
+              <div className="text-sm text-slate-500">Итого за текущий месяц</div>
+              <div className="text-2xl font-bold">{totalMonth.toFixed(2)}</div>
+            </div>
+            <div className="card p-4">
+              <div className="text-sm text-slate-500">Всего внесено</div>
+              <div className="text-2xl font-bold">{totalAll.toFixed(2)}</div>
+            </div>
+          </div>
           <h2 className="text-lg font-bold">Мои операции</h2>
-          {loading ? <div className="card p-4">Загрузка...</div> : <ReportsTable items={rows} />}
+          {loading ? (
+            <div className="card p-4">Загрузка...</div>
+          ) : grouped.length === 0 ? (
+            <div className="card p-4">Операций пока нет.</div>
+          ) : (
+            grouped.map(([month, days]) => {
+              const monthRows = Array.from(days.values()).flat();
+              const monthTotal = monthRows.reduce((acc, row) => acc + row.total, 0);
+              return (
+                <details key={month} className="card overflow-hidden" open={month === monthKey(new Date().toISOString().slice(0, 10))}>
+                  <summary className="cursor-pointer p-4 font-bold bg-[var(--brand-soft)]">
+                    {monthLabel(month)} — {monthTotal.toFixed(2)}
+                  </summary>
+                  <div className="space-y-3 p-3">
+                    {Array.from(days.entries()).sort((a, b) => b[0].localeCompare(a[0])).map(([day, dayRows]) => (
+                      <details key={day} className="rounded-xl border border-[var(--line)] bg-white" open={day === date}>
+                        <summary className="cursor-pointer p-3 font-semibold">
+                          {day} — операций: {dayRows.length} — {dayRows.reduce((acc, row) => acc + row.total, 0).toFixed(2)}
+                        </summary>
+                        <ReportsTable items={dayRows} showWorker={false} onEdit={editRow} onDelete={deleteRow} />
+                      </details>
+                    ))}
+                  </div>
+                </details>
+              );
+            })
+          )}
         </section>
       </div>
     </AppShell>

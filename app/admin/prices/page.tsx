@@ -1,6 +1,6 @@
-use client';
+'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { RequireUser } from '@/components/RequireUser';
 
@@ -17,10 +17,36 @@ type ImportedSection = {
   }[];
 };
 
+type PriceImport = {
+  id: number;
+  fileName: string;
+  version: string;
+  sectionsCount: number;
+  itemsCount: number;
+  uploadedBy: string | null;
+  uploadedAt: string;
+};
+
+function formatDate(value?: string) {
+  if (!value) return '-';
+  return new Date(value).toLocaleString('ru-RU');
+}
+
 export default function PricesPage() {
   const [sections, setSections] = useState<ImportedSection[]>([]);
+  const [latest, setLatest] = useState<PriceImport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  async function loadLatest() {
+    const res = await fetch('/api/price-imports/latest', { cache: 'no-store' });
+    const json = await res.json();
+    if (res.ok) setLatest(json.priceImport ?? null);
+  }
+
+  useEffect(() => {
+    loadLatest();
+  }, []);
 
   async function upload(file: File | null) {
     if (!file) return;
@@ -36,6 +62,7 @@ export default function PricesPage() {
       return;
     }
     setSections(json.sections);
+    setLatest(json.priceImport ?? null);
   }
 
   return (
@@ -47,6 +74,22 @@ export default function PricesPage() {
             <input className="input" type="file" accept=".xlsx,.xls" onChange={(e) => upload(e.target.files?.[0] ?? null)} />
             {loading && <div className="text-sm text-slate-600">Читаю Excel...</div>}
             {error && <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+          </div>
+
+          <div className="card p-4 mb-4">
+            <h2 className="text-lg font-bold">Текущая версия прайса</h2>
+            {latest ? (
+              <div className="mt-2 grid gap-2 text-sm md:grid-cols-2">
+                <div><b>Файл:</b> {latest.fileName}</div>
+                <div><b>Версия:</b> {latest.version}</div>
+                <div><b>Дата загрузки:</b> {formatDate(latest.uploadedAt)}</div>
+                <div><b>Загрузил:</b> {latest.uploadedBy ?? '-'}</div>
+                <div><b>Разделов:</b> {latest.sectionsCount}</div>
+                <div><b>Операций:</b> {latest.itemsCount}</div>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-slate-600">Прайс еще не загружался.</p>
+            )}
           </div>
 
           <div className="space-y-4">

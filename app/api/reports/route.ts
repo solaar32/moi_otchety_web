@@ -18,7 +18,10 @@ function isDecorativeType(value: unknown): value is DecorativeType {
   return value === 'cutPolish' || value === 'cut' || value === 'polish';
 }
 
-function priceForType(priceItem: { price: number | null; priceCutPolish: number | null; priceCut: number | null; pricePolish: number | null }, type?: DecorativeType) {
+function priceForType(
+  priceItem: { price: number | null; priceCutPolish: number | null; priceCut: number | null; pricePolish: number | null },
+  type?: DecorativeType,
+) {
   if (type === 'cutPolish') return priceItem.priceCutPolish;
   if (type === 'cut') return priceItem.priceCut;
   if (type === 'polish') return priceItem.pricePolish;
@@ -30,10 +33,11 @@ async function getReportRows(user: Awaited<ReturnType<typeof getCurrentUser>>) {
 
   const reports = await prisma.report.findMany({
     where: user.role === 'worker' ? { workerId: Number(user.id) } : undefined,
-    orderBy: { workDate: 'desc' },
+    orderBy: [{ workDate: 'desc' }, { id: 'desc' }],
     include: {
       worker: true,
       items: {
+        orderBy: { id: 'desc' },
         include: {
           priceItem: {
             include: { category: true },
@@ -43,18 +47,24 @@ async function getReportRows(user: Awaited<ReturnType<typeof getCurrentUser>>) {
     },
   });
 
-  return reports.flatMap((report) => report.items.map((item) => ({
-    id: String(item.id),
-    reportDate: formatDate(report.workDate),
-    workerName: report.worker.fullName,
-    orderNo: report.orderNumber,
-    section: item.priceItem.category.name,
-    operation: item.operationName ?? item.priceItem.name,
-    unit: item.priceItem.unit,
-    qty: item.quantity,
-    price: item.price ?? 0,
-    total: item.total,
-  })));
+  return reports.flatMap((report) => report.items.map((item) => {
+    const customerPrice = item.priceItem.customerPrice;
+    return {
+      id: String(item.id),
+      reportId: String(report.id),
+      reportDate: formatDate(report.workDate),
+      workerName: report.worker.fullName,
+      orderNo: report.orderNumber,
+      section: item.priceItem.category.name,
+      operation: item.operationName ?? item.priceItem.name,
+      unit: item.priceItem.unit,
+      qty: item.quantity,
+      price: item.price ?? 0,
+      total: item.total,
+      customerPrice,
+      customerTotal: customerPrice == null ? null : customerPrice * item.quantity,
+    };
+  }));
 }
 
 export async function GET() {
