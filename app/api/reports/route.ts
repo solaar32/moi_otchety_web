@@ -2,8 +2,27 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/current-user';
 
+const decorativeTypes = {
+  cutPolish: 'Резка+полировка',
+  cut: 'Резка',
+  polish: 'Полировка',
+} as const;
+
+type DecorativeType = keyof typeof decorativeTypes;
+
 function formatDate(date: Date) {
   return date.toISOString().slice(0, 10);
+}
+
+function isDecorativeType(value: unknown): value is DecorativeType {
+  return value === 'cutPolish' || value === 'cut' || value === 'polish';
+}
+
+function priceForType(priceItem: { price: number | null; priceCutPolish: number | null; priceCut: number | null; pricePolish: number | null }, type?: DecorativeType) {
+  if (type === 'cutPolish') return priceItem.priceCutPolish;
+  if (type === 'cut') return priceItem.priceCut;
+  if (type === 'polish') return priceItem.pricePolish;
+  return priceItem.price;
 }
 
 async function getReportRows(user: Awaited<ReturnType<typeof getCurrentUser>>) {
@@ -30,10 +49,10 @@ async function getReportRows(user: Awaited<ReturnType<typeof getCurrentUser>>) {
     workerName: report.worker.fullName,
     orderNo: report.orderNumber,
     section: item.priceItem.category.name,
-    operation: item.priceItem.name,
+    operation: item.operationName ?? item.priceItem.name,
     unit: item.priceItem.unit,
     qty: item.quantity,
-    price: item.price,
+    price: item.price ?? 0,
     total: item.total,
   })));
 }
@@ -55,15 +74,32 @@ export async function POST(request: Request) {
   const orderNumber = String(body?.orderNumber ?? '').trim();
   const priceItemId = Number(body?.priceItemId);
   const quantity = Number(String(body?.quantity ?? '').replace(',', '.'));
+  const rawOperationType = body?.operationType;
 
   if (!workDate || !orderNumber || !Number.isFinite(priceItemId) || !Number.isFinite(quantity) || quantity <= 0) {
     return NextResponse.json({ error: 'Заполните дату, заказ, операцию и объем' }, { status: 400 });
   }
 
-  const priceItem = await prisma.priceItem.findUnique({ where: { id: priceItemId } });
+  const priceItem = await prisma.priceItem.findUnique({
+    where: { id: priceItemId },
+    include: { category: true },
+  });
   if (!priceItem) return NextResponse.json({ error: 'Операция не найдена' }, { status: 404 });
 
-  const total = quantity * priceItem.price;
+  const isDecorative = priceItem.category.name.trim().toLowerCase() === 'декоративка';
+  const operationType = isDecorative && isDecorativeType(rawOperationType) ? rawOperationType : undefined;
+
+  if (isDecorative && !operationType) {
+    return NextResponse.json({ error: 'Выберите вид работы: резка+полировка, резка или полировка' }, { status: 400 });
+  }
+
+  const workerPrice = priceForType(priceItem, operationType);
+  if (workerPrice === null || workerPrice === undefined) {
+    return NextResponse.json({ error: 'У выбранной операции нет цены для работника' }, { status: 400 });
+  }
+
+  const operationName = operationType ? `${priceItem.name} — ${decorativeTypes[operationType]}` : priceItem.name;
+  const total = quantity * workerPrice;
 
   const report = await prisma.report.create({
     data: {
@@ -75,8 +111,10 @@ export async function POST(request: Request) {
         create: {
           priceItemId: priceItem.id,
           quantity,
-          price: priceItem.price,
+          price: workerPrice,
           total,
+          operationType: operationType ?? null,
+          operationName,
         },
       },
     },

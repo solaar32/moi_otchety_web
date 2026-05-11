@@ -7,8 +7,8 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 });
 
   const categories = await prisma.category.findMany({
-    orderBy: { name: 'asc' },
-    include: { items: { orderBy: { name: 'asc' } } },
+    orderBy: { id: 'asc' },
+    include: { items: { orderBy: { id: 'asc' } } },
   });
 
   return NextResponse.json({
@@ -21,6 +21,10 @@ export async function GET() {
         name: item.name,
         unit: item.unit,
         priceWorker: item.price,
+        priceCustomer: item.customerPrice,
+        priceCutPolish: item.priceCutPolish,
+        priceCut: item.priceCut,
+        pricePolish: item.pricePolish,
       })),
     })),
   });

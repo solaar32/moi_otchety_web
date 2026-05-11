@@ -32,9 +32,15 @@ model PriceItem {
   categoryId  Int
   category    Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
-  name        String
-  unit        String
-  price       Float
+  name          String
+  unit          String
+  price         Float?      // основная цена для работника
+  customerPrice Float?      // цена для заказчика, нужна работодателю
+
+  // Для листа «Декоративка»: один пункт прайса, но работник выбирает вид работы.
+  priceCutPolish Float?
+  priceCut       Float?
+  pricePolish    Float?
 
   reportItems ReportItem[]
   createdAt   DateTime     @default(now())
@@ -64,10 +70,12 @@ model ReportItem {
   priceItemId Int
   priceItem   PriceItem  @relation(fields: [priceItemId], references: [id])
 
-  quantity    Float
-  price       Float
-  total       Float
-  createdAt   DateTime   @default(now())
+  quantity      Float
+  price         Float
+  total         Float
+  operationType String?
+  operationName String?
+  createdAt     DateTime   @default(now())
 }
 
 enum Role {

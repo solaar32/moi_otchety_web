@@ -1,4 +1,4 @@
-'use client';
+use client';
 
 import { useState } from 'react';
 import { AppShell } from '@/components/AppShell';
@@ -6,7 +6,15 @@ import { RequireUser } from '@/components/RequireUser';
 
 type ImportedSection = {
   name: string;
-  items: { name: string; unit: string; priceWorker: number | null }[];
+  items: {
+    name: string;
+    unit: string;
+    priceCustomer: number | null;
+    priceWorker: number | null;
+    priceCutPolish?: number | null;
+    priceCut?: number | null;
+    pricePolish?: number | null;
+  }[];
 };
 
 export default function PricesPage() {
@@ -52,7 +60,15 @@ export default function PricesPage() {
                       <tr>
                         <th className="p-2">Операция</th>
                         <th className="p-2">Ед.</th>
-                        <th className="p-2 text-right">Цена</th>
+                        <th className="p-2 text-right">Цена заказчика</th>
+                        <th className="p-2 text-right">Цена работника</th>
+                        {section.name === 'Декоративка' && (
+                          <>
+                            <th className="p-2 text-right">Р+П</th>
+                            <th className="p-2 text-right">Резка</th>
+                            <th className="p-2 text-right">Полировка</th>
+                          </>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -60,7 +76,15 @@ export default function PricesPage() {
                         <tr key={idx} className="border-t border-[var(--line)]">
                           <td className="p-2">{item.name}</td>
                           <td className="p-2">{item.unit}</td>
+                          <td className="p-2 text-right">{item.priceCustomer ?? '-'}</td>
                           <td className="p-2 text-right">{item.priceWorker ?? '-'}</td>
+                          {section.name === 'Декоративка' && (
+                            <>
+                              <td className="p-2 text-right">{item.priceCutPolish ?? '-'}</td>
+                              <td className="p-2 text-right">{item.priceCut ?? '-'}</td>
+                              <td className="p-2 text-right">{item.pricePolish ?? '-'}</td>
+                            </>
+                          )}
                         </tr>
                       ))}
                     </tbody>

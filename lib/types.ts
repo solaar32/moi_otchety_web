@@ -18,7 +18,8 @@ export type PriceItem = {
   sectionId: string;
   name: string;
   unit: string;
-  priceWorker: number;
+  priceWorker: number | null;
+  priceCustomer?: number | null;
   priceCut?: number | null;
   pricePolish?: number | null;
   priceCutPolish?: number | null;
