@@ -39,7 +39,6 @@ export default function AdminReportsPage() {
   }), [rows, worker, section, orderNo, from, to]);
 
   const workerTotal = items.reduce((acc, item) => acc + item.total, 0);
-  const customerTotal = items.reduce((acc, item) => acc + (item.customerTotal ?? 0), 0);
   const ordersCount = new Set(items.map((item) => item.orderNo)).size;
 
   async function acceptItem(item: ReportItem) {
@@ -73,7 +72,7 @@ export default function AdminReportsPage() {
     }
     const count = items.filter((item) => item.status === 'PENDING' || item.status === 'REJECTED').length;
     if (count === 0) {
-      alert('По текущему фильтру нет работ на проверке или отклоненных работ');
+      alert('По текущему фильтру нет работ на проверке или отклоненных работ. Принятые работы уже готовы к выплате.');
       return;
     }
     if (!confirm(`Принять все работы по текущему фильтру? Количество: ${count}`)) return;
@@ -110,7 +109,7 @@ export default function AdminReportsPage() {
     <RequireUser role="admin">
       {() => (
         <AppShell title="Отчеты" role="Работодатель">
-          <div className="grid gap-3 md:grid-cols-4 mb-4">
+          <div className="grid gap-3 md:grid-cols-3 mb-4">
             <div className="card p-4">
               <div className="text-sm text-slate-500">Строк по фильтру</div>
               <div className="text-2xl font-bold">{items.length}</div>
@@ -122,10 +121,6 @@ export default function AdminReportsPage() {
             <div className="card p-4">
               <div className="text-sm text-slate-500">Сумма работникам</div>
               <div className="text-2xl font-bold">{workerTotal.toFixed(2)}</div>
-            </div>
-            <div className="card p-4">
-              <div className="text-sm text-slate-500">Сумма заказчику</div>
-              <div className="text-2xl font-bold">{customerTotal.toFixed(2)}</div>
             </div>
           </div>
 
@@ -150,7 +145,7 @@ export default function AdminReportsPage() {
             </button>
           </div>
           {!worker && <div className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Для массового принятия сначала выберите работника в фильтре.</div>}
-          {loading ? <div className="card p-4">Загрузка...</div> : <ReportsTable items={items} showCustomer onAccept={acceptItem} onReject={rejectItem} />}
+          {loading ? <div className="card p-4">Загрузка...</div> : <ReportsTable items={items} onAccept={acceptItem} onReject={rejectItem} />}
         </AppShell>
       )}
     </RequireUser>

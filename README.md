@@ -1,82 +1,74 @@
-# Мои отчеты — веб-версия
+# Мои отчеты — v20
 
-Стартовый каркас сайта вместо мобильного приложения.
+Внутренняя веб-система учета работ, проверки операций и выплат работникам.
 
-## Что уже есть
+## Новое в v20
 
-- Вход работника по логину/паролю.
-- Вход работодателя.
-- Демо-кабинет работника.
-- Демо-кабинет работодателя.
-- Страница отчетов с фильтрами.
-- Страница работников.
-- Страница загрузки Excel-прайса.
-- API `/api/import-price`, который читает Excel и возвращает разделы по листам.
-- SQL-схема Supabase в `supabase/schema.sql`.
+- v19 включена в v20.
+- Исправлена отмена выплат: работы возвращаются в статус «Принято».
+- Добавлено удаление не оплаченных выплат из журнала.
+- Суммы заказчику убраны из интерфейса работодателя, печати и CSV.
+- PDF/печать отчётов содержит выбранные фильтры.
+- Чистый seed: работодатель `Токарь / ALGEBRA3217`.
+- Добавлен `ecosystem.config.cjs` для PM2 cluster на 20 пользователей.
+- Добавлен почасовой backup PostgreSQL с поддержкой удаленного облака через rclone.
+- Добавлен скрипт восстановления пароля администратора.
+- Обновлены рекомендации по безопасности.
 
-## Демо-вход
-
-Работодатель:
-
-```text
-admin / admin123
-```
-
-Работник:
-
-```text
-Иванов / 123456
-```
-
-## Запуск локально
+## Установка на VPS
 
 ```bash
+cd /root/moi_otchety_web
+git fetch origin
+git reset --hard origin/main
+git clean -fd
+
 npm install
-npm run dev
+npx prisma db push
+npx prisma generate
+npm run build
+pm2 delete moi-otchety || true
+pm2 start ecosystem.config.cjs
+pm2 save
 ```
 
-Открыть:
+## Чистый запуск
+
+Перед очисткой обязательно сделайте backup.
+
+```bash
+cd /root/moi_otchety_web
+/root/moi_otchety_web/scripts/backup-hourly.sh
+npx prisma db push --force-reset
+npm run seed
+npm run build
+pm2 restart moi-otchety --update-env
+```
+
+Вход работодателя:
 
 ```text
-http://localhost:3000
+Токарь
+ALGEBRA3217
 ```
 
-## Следующие шаги
+## Почасовой backup
 
-1. Создать проект Supabase.
-2. Выполнить SQL из `supabase/schema.sql`.
-3. Подключить `.env.local`.
-4. Заменить демо-авторизацию на работу с таблицей `app_users`.
-5. Добавить сохранение отчетов в PostgreSQL.
+```bash
+chmod +x /root/moi_otchety_web/scripts/backup-hourly.sh
+crontab -e
+```
 
-## v9
+Добавить:
 
-- Admin can manage workers from database: add, edit login, edit full name, set new password, enable/disable worker.
-- Price upload now stores version metadata: file name, upload date, sections count, items count, uploader.
-- Admin price page shows current price version and upload date.
+```cron
+0 * * * * /root/moi_otchety_web/scripts/backup-hourly.sh >> /var/log/moi-otchety-backup.log 2>&1
+```
 
-## v15
+## Восстановление пароля администратора
 
-Добавлено:
-- экспорт отчетов в CSV и печатный HTML для сохранения в PDF;
-- экспорт ведомости выплат в CSV и печатный HTML/PDF;
-- удобства работника: поиск операций, избранные операции, последние операции, запоминание последнего номера заказа, быстрые итоги по статусам;
-- резервное копирование данных в JSON через админский раздел Backup;
-- версия сайта обновлена до v15 от 12.05.2026.
-
-## v17
-
-- Добавление администраторов работодателем: роль ADMIN имеет все функции работодателя.
-- Управление ролями пользователей: работник / администратор.
-- Отмена части действий из журнала: принятие/отклонение работ, создание выплаты, отметка выплаты оплаченной.
-- Восстановление резервной копии JSON из админки.
-- Скрипт почасового PostgreSQL backup: `scripts/backup-hourly.sh`.
-- Документ с рекомендациями по безопасности: `docs/SECURITY.md`.
-- Cookie в production теперь помечаются как secure, поэтому для входа используйте HTTPS-домен.
-
-## v18
-
-- Ограничение попыток входа.
-- Журнал входов для администратора.
-- Страница `/admin/security`.
-- Обновлённые рекомендации по защите VPS и сайта.
+```bash
+cd /root/moi_otchety_web
+node scripts/reset-admin-password.cjs Токарь НОВЫЙ_ПАРОЛЬ
+pm2 restart moi-otchety --update-env
+```

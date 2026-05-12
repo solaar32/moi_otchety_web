@@ -13,7 +13,7 @@ export async function GET() {
   const auth = await requireAdmin();
   if (auth.error) return auth.error;
 
-  const [workers, categories, priceItems, reports, reportItems, payments, paymentLines, priceImports, auditLogs] = await Promise.all([
+  const [workers, categories, priceItems, reports, reportItems, payments, paymentLines, priceImports, auditLogs, loginAttempts] = await Promise.all([
     prisma.worker.findMany({ orderBy: { id: 'asc' } }),
     prisma.category.findMany({ orderBy: { id: 'asc' } }),
     prisma.priceItem.findMany({ orderBy: { id: 'asc' } }),
@@ -23,11 +23,12 @@ export async function GET() {
     prisma.paymentLine.findMany({ orderBy: { id: 'asc' } }),
     prisma.priceImport.findMany({ orderBy: { id: 'asc' } }),
     prisma.auditLog.findMany({ orderBy: { id: 'asc' } }),
+    prisma.loginAttempt.findMany({ orderBy: { id: 'asc' } }),
   ]);
 
   const backup = {
     app: 'Мои отчеты',
-    version: 'v17',
+    version: 'v20',
     createdAt: new Date().toISOString(),
     counts: {
       workers: workers.length,
@@ -39,8 +40,9 @@ export async function GET() {
       paymentLines: paymentLines.length,
       priceImports: priceImports.length,
       auditLogs: auditLogs.length,
+      loginAttempts: loginAttempts.length,
     },
-    data: { workers, categories, priceItems, reports, reportItems, payments, paymentLines, priceImports, auditLogs },
+    data: { workers, categories, priceItems, reports, reportItems, payments, paymentLines, priceImports, auditLogs, loginAttempts },
   };
 
   const fileName = `moi-otchety-backup-${new Date().toISOString().slice(0, 10)}.json`;

@@ -46,8 +46,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const action = String(body?.action ?? '').trim();
 
   if (user.role === 'admin' && action) {
-    if (item.status === 'PAID') {
-      return NextResponse.json({ error: 'Оплаченную операцию нельзя изменять' }, { status: 400 });
+    if (item.status === 'PAID' || item.status === 'IN_PAYMENT') {
+      return NextResponse.json({ error: 'Операцию в выплате или оплаченную операцию нельзя изменять' }, { status: 400 });
     }
 
     if (action === 'accept') {

@@ -5,7 +5,6 @@ import type { ReportItem } from '@/lib/types';
 type ReportsTableProps = {
   items: ReportItem[];
   showWorker?: boolean;
-  showCustomer?: boolean;
   onEdit?: (item: ReportItem) => void;
   onDelete?: (item: ReportItem) => void;
   onAccept?: (item: ReportItem) => void;
@@ -20,6 +19,14 @@ const statusLabels: Record<string, string> = {
   PAID: 'Оплачено',
 };
 
+const statusClass: Record<string, string> = {
+  PENDING: 'bg-amber-100 text-amber-800',
+  ACCEPTED: 'bg-green-100 text-green-800',
+  REJECTED: 'bg-red-100 text-red-800',
+  IN_PAYMENT: 'bg-blue-100 text-blue-800',
+  PAID: 'bg-slate-200 text-slate-700',
+};
+
 function isLocked(status?: string) {
   return status === 'IN_PAYMENT' || status === 'PAID';
 }
@@ -27,14 +34,12 @@ function isLocked(status?: string) {
 export function ReportsTable({
   items,
   showWorker = true,
-  showCustomer = false,
   onEdit,
   onDelete,
   onAccept,
   onReject,
 }: ReportsTableProps) {
   const total = items.reduce((acc, item) => acc + item.total, 0);
-  const customerTotal = items.reduce((acc, item) => acc + (item.customerTotal ?? 0), 0);
   const actions = Boolean(onEdit || onDelete || onAccept || onReject);
 
   return (
@@ -51,13 +56,13 @@ export function ReportsTable({
               <th className="p-3 text-right">Объем</th>
               <th className="p-3 text-right">Работнику</th>
               <th className="p-3">Статус</th>
-              {showCustomer && <th className="p-3 text-right">Заказчику</th>}
               {actions && <th className="p-3 text-right">Действия</th>}
             </tr>
           </thead>
           <tbody>
             {items.map((item) => {
               const locked = isLocked(item.status);
+              const label = statusLabels[item.status ?? 'PENDING'] ?? item.status ?? 'На проверке';
               return (
                 <tr key={item.id} className="border-t border-[var(--line)]">
                   <td className="p-3">{item.reportDate}</td>
@@ -70,16 +75,15 @@ export function ReportsTable({
                   </td>
                   <td className="p-3 text-right">{item.qty} {item.unit}</td>
                   <td className="p-3 text-right font-semibold">{item.total.toFixed(2)}</td>
-                  <td className="p-3">{statusLabels[item.status ?? 'PENDING'] ?? item.status ?? 'На проверке'}</td>
-                  {showCustomer && <td className="p-3 text-right">{item.customerTotal == null ? '-' : item.customerTotal.toFixed(2)}</td>}
+                  <td className="p-3"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass[item.status ?? 'PENDING'] ?? 'bg-slate-100'}`}>{label}</span></td>
                   {actions && (
                     <td className="p-3 text-right whitespace-nowrap">
-                      {onAccept && item.status !== 'ACCEPTED' && item.status !== 'PAID' && (
+                      {onAccept && item.status !== 'ACCEPTED' && item.status !== 'IN_PAYMENT' && item.status !== 'PAID' && (
                         <button className="text-xs font-semibold text-green-700" onClick={() => onAccept(item)}>
                           Принять
                         </button>
                       )}
-                      {onReject && item.status !== 'REJECTED' && item.status !== 'PAID' && (
+                      {onReject && item.status !== 'REJECTED' && item.status !== 'IN_PAYMENT' && item.status !== 'PAID' && (
                         <button className="ml-3 text-xs font-semibold text-orange-600" onClick={() => onReject(item)}>
                           Отклонить
                         </button>
@@ -102,9 +106,9 @@ export function ReportsTable({
           </tbody>
           <tfoot>
             <tr className="border-t border-[var(--line)] bg-slate-50 font-bold">
-              <td className="p-3" colSpan={(showWorker ? 7 : 6)}>Итого</td>
+              <td className="p-3" colSpan={(showWorker ? 6 : 5)}>Итого</td>
               <td className="p-3 text-right">{total.toFixed(2)}</td>
-              {showCustomer && <td className="p-3 text-right">{customerTotal.toFixed(2)}</td>}
+              <td />
               {actions && <td />}
             </tr>
           </tfoot>

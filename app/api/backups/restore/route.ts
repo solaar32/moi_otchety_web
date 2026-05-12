@@ -2,70 +2,60 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/current-user';
 
-async function requireAdmin() {
-  const user = await getCurrentUser();
-  if (!user) return { error: NextResponse.json({ error: 'Не авторизован' }, { status: 401 }) };
-  if (user.role !== 'admin') return { error: NextResponse.json({ error: 'Нет доступа' }, { status: 403 }) };
-  return { user };
-}
+export async function POST(req: Request) {
+  try {
+    const user = await getCurrentUser();
 
-function toDate(value: unknown) {
-  if (!value) return undefined;
-  return new Date(String(value));
-}
-
-function cleanRows(rows: any[] = []) {
-  return rows.map((row) => {
-    const out: Record<string, any> = { ...row };
-    for (const key of Object.keys(out)) {
-      if (key.toLowerCase().endsWith('at') || key === 'workDate' || key === 'periodFrom' || key === 'periodTo') {
-        if (out[key]) out[key] = toDate(out[key]);
-      }
+    if (!user || user.role !== 'admin') {
+      return NextResponse.json({ error: 'Нет доступа' }, { status: 403 });
     }
-    return out;
-  });
-}
 
-export async function POST(request: Request) {
-  const auth = await requireAdmin();
-  if (auth.error) return auth.error;
+    const backup = await req.json();
+    const data = backup?.data ?? backup;
 
-  const body = await request.json().catch(() => null);
-  const data = body?.data;
-  if (!data) return NextResponse.json({ error: 'Некорректный файл резервной копии' }, { status: 400 });
+    if (!data || typeof data !== 'object') {
+      return NextResponse.json({ error: 'Некорректный файл резервной копии' }, { status: 400 });
+    }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.reportItem.deleteMany();
-    await tx.paymentLine.deleteMany();
-    await tx.payment.deleteMany();
-    await tx.report.deleteMany();
-    await tx.priceItem.deleteMany();
-    await tx.category.deleteMany();
-    await tx.priceImport.deleteMany();
-    await tx.auditLog.deleteMany();
-    await tx.worker.deleteMany();
-
-    if (data.workers?.length) await tx.worker.createMany({ data: cleanRows(data.workers) });
-    if (data.categories?.length) await tx.category.createMany({ data: cleanRows(data.categories) });
-    if (data.priceItems?.length) await tx.priceItem.createMany({ data: cleanRows(data.priceItems) });
-    if (data.reports?.length) await tx.report.createMany({ data: cleanRows(data.reports) });
-    if (data.payments?.length) await tx.payment.createMany({ data: cleanRows(data.payments) });
-    if (data.paymentLines?.length) await tx.paymentLine.createMany({ data: cleanRows(data.paymentLines) });
-    if (data.reportItems?.length) await tx.reportItem.createMany({ data: cleanRows(data.reportItems) });
-    if (data.priceImports?.length) await tx.priceImport.createMany({ data: cleanRows(data.priceImports) });
-    if (data.auditLogs?.length) await tx.auditLog.createMany({ data: cleanRows(data.auditLogs) });
-
-    await tx.auditLog.create({
-      data: {
-        actorId: Number(auth.user.id),
-        actorName: auth.user.name,
-        action: 'RESTORE_BACKUP',
-        entityType: 'Backup',
-        entityId: 'json',
-        description: `Восстановлена резервная копия от ${body.createdAt ?? 'неизвестная дата'}`,
-      },
+    const cleanRows = (rows: any[] = []) => rows.map((row) => {
+      const copy = { ...row };
+      delete copy.createdAt;
+      delete copy.updatedAt;
+      return copy;
     });
-  }, { timeout: 30000 });
 
-  return NextResponse.json({ ok: true });
+    await prisma.$transaction(async (tx) => {
+      const db = tx as any;
+
+      if (db.auditLog) await db.auditLog.deleteMany();
+      if (db.loginAttempt) await db.loginAttempt.deleteMany();
+      if (db.paymentLine) await db.paymentLine.deleteMany();
+      if (db.paymentItem) await db.paymentItem.deleteMany();
+      await db.payment.deleteMany();
+      await db.reportItem.deleteMany();
+      await db.report.deleteMany();
+      await db.priceItem.deleteMany();
+      await db.category.deleteMany();
+      if (db.priceImport) await db.priceImport.deleteMany();
+      await db.worker.deleteMany();
+
+      if (Array.isArray(data.workers) && data.workers.length) await db.worker.createMany({ data: cleanRows(data.workers) });
+      if (Array.isArray(data.categories) && data.categories.length) await db.category.createMany({ data: cleanRows(data.categories) });
+      if (Array.isArray(data.priceItems) && data.priceItems.length) await db.priceItem.createMany({ data: cleanRows(data.priceItems) });
+      if (Array.isArray(data.priceImports) && data.priceImports.length && db.priceImport) await db.priceImport.createMany({ data: cleanRows(data.priceImports) });
+      if (Array.isArray(data.reports) && data.reports.length) await db.report.createMany({ data: cleanRows(data.reports) });
+      if (Array.isArray(data.reportItems) && data.reportItems.length) await db.reportItem.createMany({ data: cleanRows(data.reportItems) });
+      if (Array.isArray(data.payments) && data.payments.length) await db.payment.createMany({ data: cleanRows(data.payments) });
+
+      const paymentLines = Array.isArray(data.paymentLines) ? data.paymentLines : data.paymentItems;
+      if (Array.isArray(paymentLines) && paymentLines.length && db.paymentLine) await db.paymentLine.createMany({ data: cleanRows(paymentLines) });
+      if (Array.isArray(data.auditLogs) && data.auditLogs.length && db.auditLog) await db.auditLog.createMany({ data: cleanRows(data.auditLogs) });
+      if (Array.isArray(data.loginAttempts) && data.loginAttempts.length && db.loginAttempt) await db.loginAttempt.createMany({ data: cleanRows(data.loginAttempts) });
+    });
+
+    return NextResponse.json({ ok: true, message: 'Резервная копия восстановлена' });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: 'Ошибка восстановления резервной копии' }, { status: 500 });
+  }
 }

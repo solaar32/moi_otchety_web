@@ -15,6 +15,13 @@ async function recalcPayment(paymentId: number) {
   await prisma.payment.update({ where: { id: paymentId }, data: { total } });
 }
 
+async function restorePaymentItems(tx: any, paymentId: number) {
+  await tx.reportItem.updateMany({
+    where: { paymentLine: { paymentId } },
+    data: { paymentLineId: null, status: 'ACCEPTED' },
+  });
+}
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
   if (auth.error) return auth.error;
@@ -51,7 +58,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (action === 'cancel') {
     if (payment.status === 'CANCELED') return NextResponse.json({ ok: true });
     await prisma.$transaction(async (tx) => {
-      await tx.reportItem.updateMany({ where: { paymentLine: { paymentId } }, data: { paymentLineId: null, status: 'ACCEPTED' } });
+      await restorePaymentItems(tx, paymentId);
       await tx.payment.update({ where: { id: paymentId }, data: { status: 'CANCELED', paidAt: null, total: 0 } });
       await tx.auditLog.create({
         data: {
@@ -95,4 +102,37 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   return NextResponse.json({ error: 'Неизвестное действие' }, { status: 400 });
+}
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin();
+  if (auth.error) return auth.error;
+
+  const { id } = await params;
+  const paymentId = Number(id);
+  if (!Number.isFinite(paymentId)) return NextResponse.json({ error: 'Некорректный ID' }, { status: 400 });
+
+  const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
+  if (!payment) return NextResponse.json({ error: 'Выплата не найдена' }, { status: 404 });
+  if (payment.status === 'PAID') {
+    return NextResponse.json({ error: 'Оплаченную выплату нельзя удалить. Сначала создайте корректировку отдельной выплатой.' }, { status: 400 });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await restorePaymentItems(tx, paymentId);
+    await tx.paymentLine.deleteMany({ where: { paymentId } });
+    await tx.payment.delete({ where: { id: paymentId } });
+    await tx.auditLog.create({
+      data: {
+        actorId: Number(auth.user.id),
+        actorName: auth.user.name,
+        action: 'DELETE_PAYMENT',
+        entityType: 'Payment',
+        entityId: String(paymentId),
+        description: `Выплата №${paymentId} удалена. Работы возвращены в статус «Принято»`,
+      },
+    });
+  });
+
+  return NextResponse.json({ ok: true });
 }

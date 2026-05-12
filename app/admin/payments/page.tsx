@@ -77,6 +77,19 @@ export default function AdminPaymentsPage() {
     await load();
   }
 
+
+  async function deletePayment(id: string) {
+    if (!confirm('Удалить выплату из журнала? Работы вернутся в статус «Принято». Оплаченные выплаты удалить нельзя.')) return;
+    setMessage('');
+    const res = await fetch(`/api/payments/${id}`, { method: 'DELETE' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setMessage(data.error ?? 'Ошибка удаления выплаты');
+      return;
+    }
+    await load();
+  }
+
   async function editLine(paymentId: string, line: Payment['lines'][number]) {
     const adjustmentRaw = prompt('Коррекция (+ премия / - аванс или штраф)', String(line.adjustment).replace('.', ','));
     if (adjustmentRaw === null) return;
@@ -149,12 +162,11 @@ export default function AdminPaymentsPage() {
                         <a className="btn-secondary" href={`/api/exports/payments/${payment.id}?format=csv`}>CSV</a>
                         <a className="btn-secondary" href={`/api/exports/payments/${payment.id}?format=print`} target="_blank">PDF / печать</a>
                       </div>
-                      {payment.status !== 'CANCELED' && (
-                        <div className="mt-2 flex flex-wrap gap-2 md:justify-end">
-                          {payment.status !== 'PAID' && <button className="btn" onClick={() => updatePayment(payment.id, 'markPaid')}>Отметить оплачено</button>}
-                          <button className="btn-secondary" onClick={() => updatePayment(payment.id, 'cancel')}>Отменить выплату</button>
-                        </div>
-                      )}
+                      <div className="mt-2 flex flex-wrap gap-2 md:justify-end">
+                        {payment.status !== 'CANCELED' && payment.status !== 'PAID' && <button className="btn" onClick={() => updatePayment(payment.id, 'markPaid')}>Отметить оплачено</button>}
+                        {payment.status !== 'CANCELED' && <button className="btn-secondary" onClick={() => updatePayment(payment.id, 'cancel')}>Отменить выплату</button>}
+                        {payment.status !== 'PAID' && <button className="btn-secondary text-red-700" onClick={() => deletePayment(payment.id)}>Удалить</button>}
+                      </div>
                     </div>
                   </div>
 

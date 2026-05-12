@@ -103,7 +103,6 @@ export default function PricesPage() {
                       <tr>
                         <th className="p-2">Операция</th>
                         <th className="p-2">Ед.</th>
-                        <th className="p-2 text-right">Цена заказчика</th>
                         <th className="p-2 text-right">Цена работника</th>
                         {section.name === 'Декоративка' && (
                           <>
@@ -119,7 +118,6 @@ export default function PricesPage() {
                         <tr key={idx} className="border-t border-[var(--line)]">
                           <td className="p-2">{item.name}</td>
                           <td className="p-2">{item.unit}</td>
-                          <td className="p-2 text-right">{item.priceCustomer ?? '-'}</td>
                           <td className="p-2 text-right">{item.priceWorker ?? '-'}</td>
                           {section.name === 'Декоративка' && (
                             <>

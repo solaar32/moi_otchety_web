@@ -10,15 +10,13 @@ FILE="$BACKUP_DIR/moi_otchety_$DATE.sql.gz"
 
 mkdir -p "$BACKUP_DIR"
 
-# Берет пароль из DATABASE_URL/.pgpass/переменных окружения PostgreSQL.
-# Если pg_dump просит пароль, добавьте файл /root/.pgpass с правами 600.
 pg_dump -h localhost -U "$DB_USER" "$DB_NAME" | gzip > "$FILE"
 
-# Храним локально 72 часовые копии.
-find "$BACKUP_DIR" -type f -name 'moi_otchety_*.sql.gz' -mtime +3 -delete
+# Храним локально 168 часовых копий: 7 дней.
+find "$BACKUP_DIR" -type f -name 'moi_otchety_*.sql.gz' -mtime +7 -delete
 
-# Опционально: выгрузка в удаленное облако через rclone.
-# Настройте rclone remote, например: rclone config -> remote name moi-cloud
+# Удаленное облако через rclone, например:
+# export RCLONE_REMOTE="yandex:backups/moi-otchety" или "b2:bucket/moi-otchety"
 if command -v rclone >/dev/null 2>&1 && [ -n "${RCLONE_REMOTE:-}" ]; then
   rclone copy "$FILE" "$RCLONE_REMOTE" --quiet
 fi
