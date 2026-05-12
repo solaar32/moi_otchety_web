@@ -105,6 +105,10 @@ export default function AdminPaymentsPage() {
                     <div className="text-left md:text-right">
                       <div className="text-sm text-slate-500">Итого</div>
                       <div className="text-2xl font-bold">{rub(payment.total)}</div>
+                      <div className="mt-2 flex flex-wrap gap-2 md:justify-end">
+                        <a className="btn-secondary" href={`/api/exports/payments/${payment.id}?format=csv`}>CSV</a>
+                        <a className="btn-secondary" href={`/api/exports/payments/${payment.id}?format=print`} target="_blank">PDF / печать</a>
+                      </div>
                       {payment.status !== 'PAID' && (
                         <div className="mt-2 flex gap-2 md:justify-end">
                           <button className="btn" onClick={() => updatePayment(payment.id, 'markPaid')}>Отметить оплачено</button>

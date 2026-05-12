@@ -54,6 +54,9 @@ function WorkerHome({ userName }: { userName: string }) {
   const [operationType, setOperationType] = useState<OperationType>('cutPolish');
   const [orderNo, setOrderNo] = useState('');
   const [qty, setQty] = useState('1');
+  const [operationSearch, setOperationSearch] = useState('');
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+  const [recentIds, setRecentIds] = useState<string[]>([]);
   const [categories, setCategories] = useState<PriceCategory[]>([]);
   const [rows, setRows] = useState<ReportItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,9 +86,36 @@ function WorkerHome({ userName }: { userName: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    try {
+      const lastOrder = localStorage.getItem('moi_otchety_last_order') ?? '';
+      const fav = JSON.parse(localStorage.getItem('moi_otchety_favorites') ?? '[]');
+      const recent = JSON.parse(localStorage.getItem('moi_otchety_recent') ?? '[]');
+      setOrderNo(lastOrder);
+      setFavoriteIds(Array.isArray(fav) ? fav : []);
+      setRecentIds(Array.isArray(recent) ? recent : []);
+    } catch {
+      // ignore local storage errors
+    }
+  }, []);
+
   const selectedSection = categories.find((s) => s.id === sectionId);
   const isDecorative = selectedSection?.name.trim().toLowerCase() === 'декоративка';
-  const sectionItems = useMemo(() => selectedSection?.items ?? [], [selectedSection]);
+  const sectionItemsRaw = useMemo(() => selectedSection?.items ?? [], [selectedSection]);
+  const sectionItems = useMemo(() => {
+    const q = operationSearch.trim().toLowerCase();
+    return sectionItemsRaw
+      .filter((item) => !q || item.name.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const af = favoriteIds.includes(a.id) ? 0 : 1;
+        const bf = favoriteIds.includes(b.id) ? 0 : 1;
+        if (af !== bf) return af - bf;
+        const ar = recentIds.indexOf(a.id);
+        const br = recentIds.indexOf(b.id);
+        if (ar !== br) return (ar === -1 ? 999 : ar) - (br === -1 ? 999 : br);
+        return a.name.localeCompare(b.name, 'ru');
+      });
+  }, [favoriteIds, operationSearch, recentIds, sectionItemsRaw]);
   const selectedItem = sectionItems.find((p) => p.id === priceItemId);
 
   const availableOperations = useMemo(() => {
@@ -152,7 +182,14 @@ function WorkerHome({ userName }: { userName: string }) {
       setError(json?.error ?? 'Ошибка сохранения');
       return;
     }
-    setOrderNo('');
+    try {
+      localStorage.setItem('moi_otchety_last_order', orderNo.trim());
+      const nextRecent = [priceItemId, ...recentIds.filter((id) => id !== priceItemId)].slice(0, 8);
+      localStorage.setItem('moi_otchety_recent', JSON.stringify(nextRecent));
+      setRecentIds(nextRecent);
+    } catch {
+      // ignore local storage errors
+    }
     setQty('1');
     await loadData();
   }
@@ -189,8 +226,24 @@ function WorkerHome({ userName }: { userName: string }) {
   function chooseSection(id: string) {
     setSectionId(id);
     setPriceItemId('');
+    setOperationSearch('');
     setOperationType('cutPolish');
   }
+
+  function toggleFavorite() {
+    if (!priceItemId) return;
+    const next = favoriteIds.includes(priceItemId)
+      ? favoriteIds.filter((id) => id !== priceItemId)
+      : [priceItemId, ...favoriteIds].slice(0, 20);
+    setFavoriteIds(next);
+    try { localStorage.setItem('moi_otchety_favorites', JSON.stringify(next)); } catch {}
+  }
+
+  const statusTotals = rows.reduce<Record<string, number>>((acc, row) => {
+    const status = row.status ?? 'PENDING';
+    acc[status] = (acc[status] ?? 0) + row.total;
+    return acc;
+  }, {});
 
   const totalMonth = rows
     .filter((row) => monthKey(row.reportDate) === monthKey(new Date().toISOString().slice(0, 10)))
@@ -240,16 +293,25 @@ function WorkerHome({ userName }: { userName: string }) {
             </div>
           </div>
           <label className="block space-y-1">
-            <span className="text-sm font-semibold">Операция {selectedSection ? `— ${selectedSection.name}` : ''}</span>
+            <span className="text-sm font-semibold">Поиск операции {selectedSection ? `— ${selectedSection.name}` : ''}</span>
+            <input className="input" value={operationSearch} onChange={(e) => setOperationSearch(e.target.value)} placeholder="Начните вводить название" />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-semibold">Операция</span>
             <select className="input" value={priceItemId} onChange={(e) => setPriceItemId(e.target.value)}>
               <option value="">Выберите операцию</option>
               {sectionItems.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} — {p.unit}
+                  {favoriteIds.includes(p.id) ? '★ ' : ''}{recentIds.includes(p.id) ? '↻ ' : ''}{p.name} — {p.unit}
                 </option>
               ))}
             </select>
           </label>
+          {priceItemId && (
+            <button type="button" className="btn-secondary w-full" onClick={toggleFavorite}>
+              {favoriteIds.includes(priceItemId) ? 'Убрать из избранного' : 'Добавить в избранное'}
+            </button>
+          )}
           {isDecorative && selectedItem && (
             <label className="block space-y-1">
               <span className="text-sm font-semibold">Вид работы</span>
@@ -292,6 +354,11 @@ function WorkerHome({ userName }: { userName: string }) {
               <div className="text-sm text-slate-500">Всего внесено</div>
               <div className="text-2xl font-bold">{totalAll.toFixed(2)}</div>
             </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="card p-3 text-sm"><b>На проверке:</b> {(statusTotals.PENDING ?? 0).toFixed(2)}</div>
+            <div className="card p-3 text-sm"><b>Принято:</b> {(statusTotals.ACCEPTED ?? 0).toFixed(2)}</div>
+            <div className="card p-3 text-sm"><b>Оплачено:</b> {(statusTotals.PAID ?? 0).toFixed(2)}</div>
           </div>
           <h2 className="text-lg font-bold">Мои операции</h2>
           {loading ? (

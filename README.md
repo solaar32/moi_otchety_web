@@ -54,3 +54,12 @@ http://localhost:3000
 - Admin can manage workers from database: add, edit login, edit full name, set new password, enable/disable worker.
 - Price upload now stores version metadata: file name, upload date, sections count, items count, uploader.
 - Admin price page shows current price version and upload date.
+
+## v15
+
+Добавлено:
+- экспорт отчетов в CSV и печатный HTML для сохранения в PDF;
+- экспорт ведомости выплат в CSV и печатный HTML/PDF;
+- удобства работника: поиск операций, избранные операции, последние операции, запоминание последнего номера заказа, быстрые итоги по статусам;
+- резервное копирование данных в JSON через админский раздел Backup;
+- версия сайта обновлена до v15 от 12.05.2026.

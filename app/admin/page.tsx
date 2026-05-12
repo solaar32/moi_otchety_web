@@ -45,7 +45,9 @@ export default function AdminPage() {
             <Link className="card p-5 font-bold hover:border-[var(--brand)]" href="/admin/reports">Отчеты и фильтры</Link>
             <Link className="card p-5 font-bold hover:border-[var(--brand)]" href="/admin/workers">Работники</Link>
             <Link className="card p-5 font-bold hover:border-[var(--brand)]" href="/admin/prices">Прайс Excel</Link>
-            <div className="card p-5 font-bold text-slate-400" title="Будет добавлено следующим этапом">Выплаты</div>
+            <Link className="card p-5 font-bold hover:border-[var(--brand)]" href="/admin/payments">Выплаты</Link>
+            <Link className="card p-5 font-bold hover:border-[var(--brand)]" href="/admin/audit">Журнал действий</Link>
+            <Link className="card p-5 font-bold hover:border-[var(--brand)]" href="/admin/backup">Backup</Link>
           </div>
           <div className="card p-4 mt-4">
             <h2 className="text-lg font-bold">Выплаты работникам</h2>

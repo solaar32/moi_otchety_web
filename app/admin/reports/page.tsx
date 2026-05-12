@@ -66,6 +66,17 @@ export default function AdminReportsPage() {
     await loadReports();
   }
 
+  function exportUrl(format: 'csv' | 'print') {
+    const params = new URLSearchParams();
+    if (worker) params.set('worker', worker);
+    if (section) params.set('section', section);
+    if (orderNo) params.set('orderNo', orderNo);
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    params.set('format', format);
+    return `/api/exports/reports?${params.toString()}`;
+  }
+
   return (
     <RequireUser role="admin">
       {() => (
@@ -101,6 +112,10 @@ export default function AdminReportsPage() {
             <input className="input" placeholder="Номер заказа" value={orderNo} onChange={(e) => setOrderNo(e.target.value)} />
             <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
             <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+          <div className="mb-4 flex flex-wrap gap-2">
+            <a className="btn" href={exportUrl('csv')}>Скачать Excel/CSV</a>
+            <a className="btn-secondary" href={exportUrl('print')} target="_blank">PDF / печать</a>
           </div>
           {loading ? <div className="card p-4">Загрузка...</div> : <ReportsTable items={items} showCustomer onAccept={acceptItem} onReject={rejectItem} />}
         </AppShell>
