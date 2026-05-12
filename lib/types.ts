@@ -39,4 +39,40 @@ export type ReportItem = {
   total: number;
   customerPrice?: number | null;
   customerTotal?: number | null;
+  status?: string;
+  rejectComment?: string | null;
+  paymentId?: string | null;
+};
+
+export type PaymentLine = {
+  id: string;
+  workerId: string;
+  workerName: string;
+  worksTotal: number;
+  adjustment: number;
+  finalTotal: number;
+  note?: string | null;
+  itemsCount: number;
+};
+
+export type Payment = {
+  id: string;
+  periodFrom: string;
+  periodTo: string;
+  status: string;
+  total: number;
+  paidAt?: string | null;
+  createdAt: string;
+  lines: PaymentLine[];
+};
+
+
+export type AuditLogItem = {
+  id: string;
+  actorName?: string | null;
+  action: string;
+  entityType: string;
+  entityId: string;
+  description: string;
+  createdAt: string;
 };

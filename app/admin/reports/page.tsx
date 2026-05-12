@@ -42,6 +42,30 @@ export default function AdminReportsPage() {
   const customerTotal = items.reduce((acc, item) => acc + (item.customerTotal ?? 0), 0);
   const ordersCount = new Set(items.map((item) => item.orderNo)).size;
 
+  async function acceptItem(item: ReportItem) {
+    const res = await fetch(`/api/reports/${item.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'accept' }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) { alert(json?.error ?? 'Ошибка принятия'); return; }
+    await loadReports();
+  }
+
+  async function rejectItem(item: ReportItem) {
+    const comment = prompt('Причина отклонения', item.rejectComment ?? '');
+    if (comment === null) return;
+    const res = await fetch(`/api/reports/${item.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reject', comment }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) { alert(json?.error ?? 'Ошибка отклонения'); return; }
+    await loadReports();
+  }
+
   return (
     <RequireUser role="admin">
       {() => (
@@ -78,7 +102,7 @@ export default function AdminReportsPage() {
             <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
             <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
-          {loading ? <div className="card p-4">Загрузка...</div> : <ReportsTable items={items} showCustomer />}
+          {loading ? <div className="card p-4">Загрузка...</div> : <ReportsTable items={items} showCustomer onAccept={acceptItem} onReject={rejectItem} />}
         </AppShell>
       )}
     </RequireUser>

@@ -14,8 +14,10 @@ model Worker {
   fullName  String
   role      Role      @default(WORKER)
   active    Boolean   @default(true)
-  reports   Report[]
-  createdAt DateTime  @default(now())
+  reports      Report[]
+  paymentLines PaymentLine[]
+  auditLogs    AuditLog[]
+  createdAt    DateTime      @default(now())
   updatedAt DateTime  @updatedAt
 }
 
@@ -75,7 +77,57 @@ model ReportItem {
   total         Float
   operationType String?
   operationName String?
+  status        String     @default("PENDING")
+  rejectComment String?
+
+  paymentLineId Int?
+  paymentLine   PaymentLine? @relation(fields: [paymentLineId], references: [id])
+
   createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model Payment {
+  id          Int           @id @default(autoincrement())
+  periodFrom  DateTime
+  periodTo    DateTime
+  status      String        @default("CREATED") // CREATED / PAID
+  total       Float         @default(0)
+  paidAt      DateTime?
+  lines       PaymentLine[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model PaymentLine {
+  id          Int          @id @default(autoincrement())
+  paymentId   Int
+  payment     Payment      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  workerId    Int
+  worker      Worker       @relation(fields: [workerId], references: [id])
+  workerName  String
+
+  worksTotal  Float        @default(0)
+  adjustment  Float        @default(0)
+  finalTotal  Float        @default(0)
+  note        String?
+
+  items       ReportItem[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  actorId     Int?
+  actor       Worker?  @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorName   String?
+  action      String
+  entityType  String
+  entityId    String
+  description String
+  createdAt   DateTime @default(now())
 }
 
 model PriceImport {

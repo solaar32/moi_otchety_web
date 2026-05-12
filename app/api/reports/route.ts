@@ -63,6 +63,9 @@ async function getReportRows(user: Awaited<ReturnType<typeof getCurrentUser>>) {
       total: item.total,
       customerPrice,
       customerTotal: customerPrice == null ? null : customerPrice * item.quantity,
+      status: item.status,
+      rejectComment: item.rejectComment,
+      paymentId: item.paymentLineId == null ? null : String(item.paymentLineId),
     };
   }));
 }
@@ -125,8 +128,20 @@ export async function POST(request: Request) {
           total,
           operationType: operationType ?? null,
           operationName,
+          status: 'PENDING',
         },
       },
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: Number(user.id),
+      actorName: user.name,
+      action: 'CREATE_REPORT_ITEM',
+      entityType: 'Report',
+      entityId: String(report.id),
+      description: `Создана операция: ${operationName}, заказ ${orderNumber}, объем ${quantity}`,
     },
   });
 
