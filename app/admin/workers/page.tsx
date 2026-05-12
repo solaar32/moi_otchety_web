@@ -9,6 +9,7 @@ type WorkerRow = {
   login: string;
   fullName: string;
   active: boolean;
+  role: 'admin' | 'worker';
   createdAt?: string;
   updatedAt?: string;
 };
@@ -21,6 +22,7 @@ export default function WorkersPage() {
   const [login, setLogin] = useState('');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState<'worker' | 'admin'>('worker');
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -53,7 +55,7 @@ export default function WorkersPage() {
     const res = await fetch('/api/workers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ login, fullName, password }),
+      body: JSON.stringify({ login, fullName, password, role }),
     });
     const json = await res.json();
     if (!res.ok) {
@@ -63,7 +65,8 @@ export default function WorkersPage() {
     setLogin('');
     setFullName('');
     setPassword('');
-    setMessage('Работник добавлен');
+    setRole('worker');
+    setMessage(role === 'admin' ? 'Администратор добавлен' : 'Работник добавлен');
     await loadWorkers();
   }
 
@@ -96,13 +99,18 @@ export default function WorkersPage() {
   return (
     <RequireUser role="admin">
       {() => (
-        <AppShell title="Работники" role="Работодатель">
+        <AppShell title="Пользователи" role="Работодатель">
           <div className="card p-4 mb-4 space-y-3">
-            <h2 className="text-lg font-bold">Добавить работника</h2>
-            <div className="grid gap-3 md:grid-cols-4">
+            <h2 className="text-lg font-bold">Добавить пользователя</h2>
+            <p className="text-sm text-slate-500">Администратор получает все функции работодателя: отчеты, прайс, выплаты, журнал и резервные копии.</p>
+            <div className="grid gap-3 md:grid-cols-5">
               <input className="input" placeholder="Логин / фамилия" value={login} onChange={(e) => setLogin(e.target.value)} />
               <input className="input" placeholder="ФИО" value={fullName} onChange={(e) => setFullName(e.target.value)} />
               <input className="input" placeholder="Пароль" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <select className="input" value={role} onChange={(e) => setRole(e.target.value as 'worker' | 'admin')}>
+                <option value="worker">Работник</option>
+                <option value="admin">Администратор</option>
+              </select>
               <button className="btn-primary" onClick={addWorker}>Добавить</button>
             </div>
           </div>
@@ -120,6 +128,7 @@ export default function WorkersPage() {
                     <th className="p-3">Логин</th>
                     <th className="p-3">ФИО</th>
                     <th className="p-3">Новый пароль</th>
+                    <th className="p-3">Роль</th>
                     <th className="p-3">Статус</th>
                     <th className="p-3"></th>
                   </tr>
@@ -137,6 +146,12 @@ export default function WorkersPage() {
                         </td>
                         <td className="p-3">
                           <input className="input" placeholder="Не менять" value={draft.password} onChange={(e) => updateDraft(worker.id, { password: e.target.value })} />
+                        </td>
+                        <td className="p-3">
+                          <select className="input" value={draft.role} onChange={(e) => updateDraft(worker.id, { role: e.target.value as 'worker' | 'admin' })}>
+                            <option value="worker">Работник</option>
+                            <option value="admin">Администратор</option>
+                          </select>
                         </td>
                         <td className="p-3">
                           <label className="flex items-center gap-2">

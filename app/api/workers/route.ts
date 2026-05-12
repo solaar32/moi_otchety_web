@@ -10,24 +10,34 @@ async function requireAdmin() {
   return { user };
 }
 
+function normalizeRole(value: unknown) {
+  return String(value ?? '').toUpperCase() === 'ADMIN' ? 'ADMIN' : 'WORKER';
+}
+
 export async function GET() {
   const auth = await requireAdmin();
   if (auth.error) return auth.error;
 
   const workers = await prisma.worker.findMany({
-    where: { role: 'WORKER' },
-    orderBy: [{ active: 'desc' }, { fullName: 'asc' }],
+    orderBy: [{ role: 'asc' }, { active: 'desc' }, { fullName: 'asc' }],
     select: {
       id: true,
       login: true,
       fullName: true,
+      role: true,
       active: true,
       createdAt: true,
       updatedAt: true,
     },
   });
 
-  return NextResponse.json({ workers: workers.map((w) => ({ ...w, id: String(w.id) })) });
+  return NextResponse.json({
+    workers: workers.map((w) => ({
+      ...w,
+      id: String(w.id),
+      role: w.role.toLowerCase(),
+    })),
+  });
 }
 
 export async function POST(request: Request) {
@@ -38,6 +48,7 @@ export async function POST(request: Request) {
   const login = String(body?.login ?? '').trim();
   const fullName = String(body?.fullName ?? '').trim();
   const password = String(body?.password ?? '').trim();
+  const role = normalizeRole(body?.role);
 
   if (!login || !fullName || !password) {
     return NextResponse.json({ error: 'Укажите логин, ФИО и пароль' }, { status: 400 });
@@ -51,11 +62,22 @@ export async function POST(request: Request) {
       login,
       fullName,
       password: await bcrypt.hash(password, 10),
-      role: 'WORKER',
+      role,
       active: true,
     },
-    select: { id: true, login: true, fullName: true, active: true, createdAt: true, updatedAt: true },
+    select: { id: true, login: true, fullName: true, role: true, active: true, createdAt: true, updatedAt: true },
   });
 
-  return NextResponse.json({ worker: { ...worker, id: String(worker.id) } });
+  await prisma.auditLog.create({
+    data: {
+      actorId: Number(auth.user.id),
+      actorName: auth.user.name,
+      action: role === 'ADMIN' ? 'CREATE_ADMIN' : 'CREATE_WORKER',
+      entityType: 'Worker',
+      entityId: String(worker.id),
+      description: `Создан пользователь ${worker.fullName} (${worker.login}), роль: ${role}`,
+    },
+  });
+
+  return NextResponse.json({ worker: { ...worker, id: String(worker.id), role: worker.role.toLowerCase() } });
 }

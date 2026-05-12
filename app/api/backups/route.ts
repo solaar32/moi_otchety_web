@@ -27,7 +27,7 @@ export async function GET() {
 
   const backup = {
     app: 'Мои отчеты',
-    version: 'v15',
+    version: 'v17',
     createdAt: new Date().toISOString(),
     counts: {
       workers: workers.length,

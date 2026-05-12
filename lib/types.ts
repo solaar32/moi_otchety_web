@@ -76,3 +76,14 @@ export type AuditLogItem = {
   description: string;
   createdAt: string;
 };
+
+
+export type LoginAttemptItem = {
+  id: string;
+  login: string;
+  ip?: string | null;
+  userAgent?: string | null;
+  success: boolean;
+  reason?: string | null;
+  createdAt: string;
+};

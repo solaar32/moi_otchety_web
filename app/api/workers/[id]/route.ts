@@ -10,6 +10,10 @@ async function requireAdmin() {
   return { user };
 }
 
+function normalizeRole(value: unknown) {
+  return String(value ?? '').toUpperCase() === 'ADMIN' || String(value ?? '').toLowerCase() === 'admin' ? 'ADMIN' : 'WORKER';
+}
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
   if (auth.error) return auth.error;
@@ -23,28 +27,48 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const fullName = String(body?.fullName ?? '').trim();
   const password = String(body?.password ?? '').trim();
   const active = Boolean(body?.active);
+  const role = normalizeRole(body?.role);
 
   if (!login || !fullName) {
     return NextResponse.json({ error: 'Укажите логин и ФИО' }, { status: 400 });
   }
 
-  const data: { login: string; fullName: string; active: boolean; password?: string } = {
+  const adminCount = await prisma.worker.count({ where: { role: 'ADMIN', active: true } });
+  const current = await prisma.worker.findUnique({ where: { id: workerId } });
+  if (!current) return NextResponse.json({ error: 'Пользователь не найден' }, { status: 404 });
+  if (current.role === 'ADMIN' && (!active || role !== 'ADMIN') && adminCount <= 1) {
+    return NextResponse.json({ error: 'Нельзя отключить или понизить последнего активного администратора' }, { status: 400 });
+  }
+
+  const data: { login: string; fullName: string; active: boolean; role: 'ADMIN' | 'WORKER'; password?: string } = {
     login,
     fullName,
     active,
+    role,
   };
 
   if (password) data.password = await bcrypt.hash(password, 10);
 
   try {
     const worker = await prisma.worker.update({
-      where: { id: workerId, role: 'WORKER' },
+      where: { id: workerId },
       data,
-      select: { id: true, login: true, fullName: true, active: true, createdAt: true, updatedAt: true },
+      select: { id: true, login: true, fullName: true, role: true, active: true, createdAt: true, updatedAt: true },
     });
 
-    return NextResponse.json({ worker: { ...worker, id: String(worker.id) } });
+    await prisma.auditLog.create({
+      data: {
+        actorId: Number(auth.user.id),
+        actorName: auth.user.name,
+        action: 'UPDATE_USER',
+        entityType: 'Worker',
+        entityId: String(worker.id),
+        description: `Изменен пользователь ${worker.fullName} (${worker.login}), роль: ${worker.role}, активен: ${worker.active ? 'да' : 'нет'}${password ? ', пароль изменен' : ''}`,
+      },
+    });
+
+    return NextResponse.json({ worker: { ...worker, id: String(worker.id), role: worker.role.toLowerCase() } });
   } catch {
-    return NextResponse.json({ error: 'Работник не найден или логин уже занят' }, { status: 400 });
+    return NextResponse.json({ error: 'Пользователь не найден или логин уже занят' }, { status: 400 });
   }
 }

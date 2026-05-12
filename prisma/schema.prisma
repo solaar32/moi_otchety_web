@@ -140,6 +140,19 @@ model PriceImport {
   uploadedAt    DateTime @default(now())
 }
 
+model LoginAttempt {
+  id        Int      @id @default(autoincrement())
+  login     String
+  ip        String?
+  userAgent String?
+  success   Boolean  @default(false)
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([login, createdAt])
+  @@index([ip, createdAt])
+}
+
 enum Role {
   ADMIN
   WORKER

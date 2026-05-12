@@ -47,6 +47,7 @@ export default function AdminPage() {
             <Link className="card p-5 font-bold hover:border-[var(--brand)]" href="/admin/prices">Прайс Excel</Link>
             <Link className="card p-5 font-bold hover:border-[var(--brand)]" href="/admin/payments">Выплаты</Link>
             <Link className="card p-5 font-bold hover:border-[var(--brand)]" href="/admin/audit">Журнал действий</Link>
+            <Link className="card p-5 font-bold hover:border-[var(--brand)]" href="/admin/security">Безопасность</Link>
             <Link className="card p-5 font-bold hover:border-[var(--brand)]" href="/admin/backup">Backup</Link>
           </div>
           <div className="card p-4 mt-4">

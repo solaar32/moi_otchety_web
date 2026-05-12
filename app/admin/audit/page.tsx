@@ -8,6 +8,7 @@ import type { AuditLogItem } from '@/lib/types';
 export default function AdminAuditPage() {
   const [items, setItems] = useState<AuditLogItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
 
   async function loadAudit() {
     setLoading(true);
@@ -19,10 +20,24 @@ export default function AdminAuditPage() {
 
   useEffect(() => { loadAudit(); }, []);
 
+  async function undoAudit(id: string) {
+    if (!confirm('Отменить действие из журнала? Некоторые действия нельзя отменить автоматически.')) return;
+    setMessage('');
+    const res = await fetch(`/api/audit/${id}`, { method: 'PATCH' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setMessage(data.error ?? 'Не удалось отменить действие');
+      return;
+    }
+    setMessage('Действие отменено');
+    await loadAudit();
+  }
+
   return (
     <RequireUser role="admin">
       {() => (
         <AppShell title="Журнал действий" role="Работодатель">
+          {message && <div className="mb-4 rounded-xl bg-slate-100 p-3 text-sm font-semibold">{message}</div>}
           <div className="card overflow-hidden">
             {loading ? (
               <div className="p-4">Загрузка...</div>
@@ -37,6 +52,7 @@ export default function AdminAuditPage() {
                       <th className="p-3">Пользователь</th>
                       <th className="p-3">Действие</th>
                       <th className="p-3">Описание</th>
+                      <th className="p-3"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -46,6 +62,11 @@ export default function AdminAuditPage() {
                         <td className="p-3">{item.actorName ?? '-'}</td>
                         <td className="p-3">{item.action}</td>
                         <td className="p-3">{item.description}</td>
+                        <td className="p-3 text-right">
+                          {!item.action.endsWith('_UNDO') && (
+                            <button className="text-xs font-semibold text-[var(--brand)]" onClick={() => undoAudit(item.id)}>Отменить</button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { BarChart3, DatabaseBackup, FileSpreadsheet, History, Home, LogOut, Users, WalletCards } from 'lucide-react';
+import { BarChart3, DatabaseBackup, FileSpreadsheet, History, Home, LogOut, ShieldCheck, Users, WalletCards } from 'lucide-react';
 import { APP_VERSION_LABEL } from '@/lib/app-info';
 
 export function AppShell({ title, role, children }: { title: string; role: string; children: React.ReactNode }) {
@@ -22,6 +22,7 @@ export function AppShell({ title, role, children }: { title: string; role: strin
     { href: '/admin/prices', label: 'Прайс', icon: FileSpreadsheet },
     { href: '/admin/payments', label: 'Выплаты', icon: WalletCards },
     { href: '/admin/audit', label: 'Журнал', icon: History },
+    { href: '/admin/security', label: 'Безопасность', icon: ShieldCheck },
     { href: '/admin/backup', label: 'Backup', icon: DatabaseBackup },
   ];
 
