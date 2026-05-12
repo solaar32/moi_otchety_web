@@ -9,6 +9,12 @@ async function requireAdmin() {
   return { user };
 }
 
+async function recalcPayment(paymentId: number) {
+  const lines = await prisma.paymentLine.findMany({ where: { paymentId } });
+  const total = lines.reduce((acc, line) => acc + line.finalTotal, 0);
+  await prisma.payment.update({ where: { id: paymentId }, data: { total } });
+}
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
   if (auth.error) return auth.error;
@@ -17,25 +23,73 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const paymentId = Number(id);
   if (!Number.isFinite(paymentId)) return NextResponse.json({ error: 'Некорректный ID' }, { status: 400 });
 
+  const payment = await prisma.payment.findUnique({ where: { id: paymentId }, include: { lines: true } });
+  if (!payment) return NextResponse.json({ error: 'Выплата не найдена' }, { status: 404 });
+
   const body = await request.json().catch(() => null);
   const action = String(body?.action ?? '');
 
   if (action === 'markPaid') {
+    if (payment.status === 'CANCELED') return NextResponse.json({ error: 'Отмененную выплату нельзя оплатить' }, { status: 400 });
     await prisma.$transaction([
       prisma.payment.update({ where: { id: paymentId }, data: { status: 'PAID', paidAt: new Date() } }),
       prisma.reportItem.updateMany({ where: { paymentLine: { paymentId } }, data: { status: 'PAID' } }),
+      prisma.auditLog.create({
+        data: {
+          actorId: Number(auth.user.id),
+          actorName: auth.user.name,
+          action: 'MARK_PAYMENT_PAID',
+          entityType: 'Payment',
+          entityId: String(paymentId),
+          description: `Выплата №${paymentId} отмечена оплаченной`,
+        },
+      }),
     ]);
     return NextResponse.json({ ok: true });
   }
 
   if (action === 'cancel') {
-    const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
-    if (!payment) return NextResponse.json({ error: 'Выплата не найдена' }, { status: 404 });
-    if (payment.status === 'PAID') return NextResponse.json({ error: 'Оплаченную выплату нельзя отменить' }, { status: 400 });
-
+    if (payment.status === 'CANCELED') return NextResponse.json({ ok: true });
     await prisma.$transaction(async (tx) => {
       await tx.reportItem.updateMany({ where: { paymentLine: { paymentId } }, data: { paymentLineId: null, status: 'ACCEPTED' } });
-      await tx.payment.delete({ where: { id: paymentId } });
+      await tx.payment.update({ where: { id: paymentId }, data: { status: 'CANCELED', paidAt: null, total: 0 } });
+      await tx.auditLog.create({
+        data: {
+          actorId: Number(auth.user.id),
+          actorName: auth.user.name,
+          action: 'CANCEL_PAYMENT',
+          entityType: 'Payment',
+          entityId: String(paymentId),
+          description: `Выплата №${paymentId} отменена. Работы возвращены в статус «Принято»`,
+        },
+      });
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === 'updateLine') {
+    if (payment.status !== 'CREATED') {
+      return NextResponse.json({ error: 'Редактировать можно только созданную выплату' }, { status: 400 });
+    }
+    const lineId = Number(body?.lineId);
+    const adjustment = Number(String(body?.adjustment ?? 0).replace(',', '.')) || 0;
+    const note = String(body?.note ?? '').trim();
+    const line = await prisma.paymentLine.findUnique({ where: { id: lineId } });
+    if (!line || line.paymentId !== paymentId) return NextResponse.json({ error: 'Строка выплаты не найдена' }, { status: 404 });
+    await prisma.paymentLine.update({
+      where: { id: lineId },
+      data: { adjustment, note: note || null, finalTotal: line.worksTotal + adjustment },
+    });
+    await recalcPayment(paymentId);
+    await prisma.auditLog.create({
+      data: {
+        actorId: Number(auth.user.id),
+        actorName: auth.user.name,
+        action: 'EDIT_PAYMENT_LINE',
+        entityType: 'PaymentLine',
+        entityId: String(lineId),
+        description: `Изменена строка выплаты №${paymentId}: коррекция ${adjustment}, примечание: ${note || '-'}`,
+      },
     });
     return NextResponse.json({ ok: true });
   }

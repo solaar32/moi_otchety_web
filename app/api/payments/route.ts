@@ -57,6 +57,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const from = String(body?.from ?? '').trim();
   const to = String(body?.to ?? '').trim();
+  const workerId = body?.workerId ? Number(body.workerId) : null;
 
   if (!from || !to) {
     return NextResponse.json({ error: 'Выберите период выплаты' }, { status: 400 });
@@ -71,22 +72,23 @@ export async function POST(request: Request) {
       status: 'ACCEPTED',
       report: {
         workDate: { gte: periodFrom, lte: periodTo },
+        ...(workerId ? { workerId } : {}),
       },
     },
     include: { report: { include: { worker: true } } },
   });
 
   if (items.length === 0) {
-    return NextResponse.json({ error: 'За выбранный период нет неоплаченных работ' }, { status: 400 });
+    return NextResponse.json({ error: 'За выбранный период нет неоплаченных принятых работ' }, { status: 400 });
   }
 
   const grouped = new Map<number, { workerName: string; total: number; ids: number[] }>();
   for (const item of items) {
-    const workerId = item.report.workerId;
-    const existing = grouped.get(workerId) ?? { workerName: item.report.worker.fullName, total: 0, ids: [] };
+    const currentWorkerId = item.report.workerId;
+    const existing = grouped.get(currentWorkerId) ?? { workerName: item.report.worker.fullName, total: 0, ids: [] };
     existing.total += item.total;
     existing.ids.push(item.id);
-    grouped.set(workerId, existing);
+    grouped.set(currentWorkerId, existing);
   }
 
   const total = Array.from(grouped.values()).reduce((acc, g) => acc + g.total, 0);
@@ -101,11 +103,11 @@ export async function POST(request: Request) {
       },
     });
 
-    for (const [workerId, group] of grouped.entries()) {
+    for (const [currentWorkerId, group] of grouped.entries()) {
       const line = await tx.paymentLine.create({
         data: {
           paymentId: created.id,
-          workerId,
+          workerId: currentWorkerId,
           workerName: group.workerName,
           worksTotal: group.total,
           adjustment: 0,
@@ -118,6 +120,17 @@ export async function POST(request: Request) {
         data: { paymentLineId: line.id, status: 'IN_PAYMENT' },
       });
     }
+
+    await tx.auditLog.create({
+      data: {
+        actorId: Number(auth.user.id),
+        actorName: auth.user.name,
+        action: 'CREATE_PAYMENT',
+        entityType: 'Payment',
+        entityId: String(created.id),
+        description: `Создана выплата за период ${from} — ${to}${workerId ? ` по работнику ID ${workerId}` : ''}`,
+      },
+    });
 
     return created;
   });

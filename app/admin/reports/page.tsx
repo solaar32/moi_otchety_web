@@ -66,6 +66,35 @@ export default function AdminReportsPage() {
     await loadReports();
   }
 
+  async function acceptFilteredByWorker() {
+    if (!worker) {
+      alert('Сначала выберите работника в фильтре');
+      return;
+    }
+    const count = items.filter((item) => item.status === 'PENDING' || item.status === 'REJECTED').length;
+    if (count === 0) {
+      alert('По текущему фильтру нет работ на проверке или отклоненных работ');
+      return;
+    }
+    if (!confirm(`Принять все работы по текущему фильтру? Количество: ${count}`)) return;
+    const res = await fetch('/api/reports/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'acceptFiltered',
+        workerName: worker,
+        section,
+        orderNo,
+        from,
+        to,
+      }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) { alert(json?.error ?? 'Ошибка массового принятия'); return; }
+    alert(`Принято работ: ${json.count ?? 0}`);
+    await loadReports();
+  }
+
   function exportUrl(format: 'csv' | 'print') {
     const params = new URLSearchParams();
     if (worker) params.set('worker', worker);
@@ -116,7 +145,11 @@ export default function AdminReportsPage() {
           <div className="mb-4 flex flex-wrap gap-2">
             <a className="btn" href={exportUrl('csv')}>Скачать Excel/CSV</a>
             <a className="btn-secondary" href={exportUrl('print')} target="_blank">PDF / печать</a>
+            <button className="btn-secondary" onClick={acceptFilteredByWorker} disabled={!worker}>
+              Принять все по работнику
+            </button>
           </div>
+          {!worker && <div className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Для массового принятия сначала выберите работника в фильтре.</div>}
           {loading ? <div className="card p-4">Загрузка...</div> : <ReportsTable items={items} showCustomer onAccept={acceptItem} onReject={rejectItem} />}
         </AppShell>
       )}
