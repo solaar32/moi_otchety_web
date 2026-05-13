@@ -12,13 +12,17 @@ model Worker {
   login     String    @unique
   password  String
   fullName  String
+  email     String?
   role      Role      @default(WORKER)
   active    Boolean   @default(true)
+
   reports      Report[]
   paymentLines PaymentLine[]
   auditLogs    AuditLog[]
-  createdAt    DateTime      @default(now())
-  updatedAt DateTime  @updatedAt
+  resetTokens  PasswordResetToken[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model Category {
@@ -36,10 +40,9 @@ model PriceItem {
 
   name          String
   unit          String
-  price         Float?      // основная цена для работника
-  customerPrice Float?      // цена для заказчика, нужна работодателю
+  price         Float?
+  customerPrice Float?
 
-  // Для листа «Декоративка»: один пункт прайса, но работник выбирает вид работы.
   priceCutPolish Float?
   priceCut       Float?
   pricePolish    Float?
@@ -69,14 +72,15 @@ model ReportItem {
   reportId    Int
   report      Report     @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
-  priceItemId Int
-  priceItem   PriceItem  @relation(fields: [priceItemId], references: [id])
+  priceItemId Int?
+  priceItem   PriceItem? @relation(fields: [priceItemId], references: [id])
 
   quantity      Float
   price         Float
   total         Float
   operationType String?
   operationName String?
+  customUnit    String?
   status        String     @default("PENDING")
   rejectComment String?
 
@@ -91,7 +95,7 @@ model Payment {
   id          Int           @id @default(autoincrement())
   periodFrom  DateTime
   periodTo    DateTime
-  status      String        @default("CREATED") // CREATED / PAID
+  status      String        @default("CREATED")
   total       Float         @default(0)
   paidAt      DateTime?
   lines       PaymentLine[]
@@ -151,6 +155,23 @@ model LoginAttempt {
 
   @@index([login, createdAt])
   @@index([ip, createdAt])
+}
+
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  workerId  Int
+  worker    Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  tokenHash String   @unique
+  ip        String?
+  userAgent String?
+
+  usedAt    DateTime?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([workerId, createdAt])
+  @@index([expiresAt])
 }
 
 enum Role {

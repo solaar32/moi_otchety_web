@@ -38,31 +38,27 @@ async function getReportRows(user: Awaited<ReturnType<typeof getCurrentUser>>) {
       worker: true,
       items: {
         orderBy: { id: 'desc' },
-        include: {
-          priceItem: {
-            include: { category: true },
-          },
-        },
+        include: { priceItem: { include: { category: true } } },
       },
     },
   });
 
   return reports.flatMap((report) => report.items.map((item) => {
-    const customerPrice = item.priceItem.customerPrice;
+    const isCustom = !item.priceItemId || !item.priceItem;
     return {
       id: String(item.id),
       reportId: String(report.id),
       reportDate: formatDate(report.workDate),
       workerName: report.worker.fullName,
       orderNo: report.orderNumber,
-      section: item.priceItem.category.name,
-      operation: item.operationName ?? item.priceItem.name,
-      unit: item.priceItem.unit,
+      section: isCustom ? 'Нестандартные операции' : item.priceItem!.category.name,
+      operation: item.operationName ?? item.priceItem?.name ?? 'Нестандартная операция',
+      unit: isCustom ? (item.customUnit ?? '') : (item.priceItem?.unit ?? ''),
       qty: item.quantity,
       price: item.price ?? 0,
       total: item.total,
-      customerPrice,
-      customerTotal: customerPrice == null ? null : customerPrice * item.quantity,
+      customerPrice: null,
+      customerTotal: null,
       status: item.status,
       rejectComment: item.rejectComment,
       paymentId: item.paymentLineId == null ? null : String(item.paymentLineId),
@@ -85,31 +81,69 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const workDate = String(body?.workDate ?? '').trim();
   const orderNumber = String(body?.orderNumber ?? '').trim();
-  const priceItemId = Number(body?.priceItemId);
   const quantity = Number(String(body?.quantity ?? '').replace(',', '.'));
+
+  if (body?.kind === 'custom') {
+    const operationName = String(body?.operationName ?? '').trim();
+    const customUnit = String(body?.unit ?? '').trim();
+    const price = Number(String(body?.price ?? '').replace(',', '.'));
+
+    if (!workDate || !orderNumber || !operationName || !customUnit || !Number.isFinite(price) || price < 0 || !Number.isFinite(quantity) || quantity <= 0) {
+      return NextResponse.json({ error: 'Заполните дату, заказ, наименование, ед. изм., цену и количество' }, { status: 400 });
+    }
+
+    const total = quantity * price;
+    const report = await prisma.report.create({
+      data: {
+        workerId: Number(user.id),
+        orderNumber,
+        workDate: new Date(`${workDate}T00:00:00.000Z`),
+        total,
+        items: {
+          create: {
+            quantity,
+            price,
+            total,
+            operationType: 'custom',
+            operationName,
+            customUnit,
+            status: 'PENDING',
+          },
+        },
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: Number(user.id),
+        actorName: user.name,
+        action: 'CREATE_CUSTOM_REPORT_ITEM',
+        entityType: 'Report',
+        entityId: String(report.id),
+        description: `Создана нестандартная операция: ${operationName}, заказ ${orderNumber}, ${quantity} ${customUnit} × ${price}`,
+      },
+    });
+
+    return NextResponse.json({ ok: true, reportId: String(report.id) });
+  }
+
+  const priceItemId = Number(body?.priceItemId);
   const rawOperationType = body?.operationType;
 
   if (!workDate || !orderNumber || !Number.isFinite(priceItemId) || !Number.isFinite(quantity) || quantity <= 0) {
     return NextResponse.json({ error: 'Заполните дату, заказ, операцию и объем' }, { status: 400 });
   }
 
-  const priceItem = await prisma.priceItem.findUnique({
-    where: { id: priceItemId },
-    include: { category: true },
-  });
+  const priceItem = await prisma.priceItem.findUnique({ where: { id: priceItemId }, include: { category: true } });
   if (!priceItem) return NextResponse.json({ error: 'Операция не найдена' }, { status: 404 });
 
   const isDecorative = priceItem.category.name.trim().toLowerCase() === 'декоративка';
   const operationType = isDecorative && isDecorativeType(rawOperationType) ? rawOperationType : undefined;
 
-  if (isDecorative && !operationType) {
-    return NextResponse.json({ error: 'Выберите вид работы: резка+полировка, резка или полировка' }, { status: 400 });
-  }
+  if (isDecorative && !operationType) return NextResponse.json({ error: 'Выберите вид работы: резка+полировка, резка или полировка' }, { status: 400 });
 
   const workerPrice = priceForType(priceItem, operationType);
-  if (workerPrice === null || workerPrice === undefined) {
-    return NextResponse.json({ error: 'У выбранной операции нет цены для работника' }, { status: 400 });
-  }
+  if (workerPrice === null || workerPrice === undefined) return NextResponse.json({ error: 'У выбранной операции нет цены для работника' }, { status: 400 });
 
   const operationName = operationType ? `${priceItem.name} — ${decorativeTypes[operationType]}` : priceItem.name;
   const total = quantity * workerPrice;
@@ -121,15 +155,7 @@ export async function POST(request: Request) {
       workDate: new Date(`${workDate}T00:00:00.000Z`),
       total,
       items: {
-        create: {
-          priceItemId: priceItem.id,
-          quantity,
-          price: workerPrice,
-          total,
-          operationType: operationType ?? null,
-          operationName,
-          status: 'PENDING',
-        },
+        create: { priceItemId: priceItem.id, quantity, price: workerPrice, total, operationType: operationType ?? null, operationName, status: 'PENDING' },
       },
     },
   });

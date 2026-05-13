@@ -8,10 +8,7 @@ export type User = {
   active: boolean;
 };
 
-export type PriceSection = {
-  id: string;
-  name: string;
-};
+export type PriceSection = { id: string; name: string };
 
 export type PriceItem = {
   id: string;
@@ -66,7 +63,6 @@ export type Payment = {
   lines: PaymentLine[];
 };
 
-
 export type AuditLogItem = {
   id: string;
   actorName?: string | null;
@@ -76,7 +72,6 @@ export type AuditLogItem = {
   description: string;
   createdAt: string;
 };
-
 
 export type LoginAttemptItem = {
   id: string;
