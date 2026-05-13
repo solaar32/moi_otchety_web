@@ -59,6 +59,12 @@ export default function LoginPage() {
         <button className="btn-primary w-full disabled:opacity-50" type="submit" disabled={loading}>
           {loading ? 'Вход...' : 'Войти'}
         </button>
+<a
+  href="/forgot-password"
+  className="block text-center text-sm font-medium text-[var(--brand)] hover:underline"
+>
+  Забыли пароль?
+</a>
       </form>
     </main>
   );
