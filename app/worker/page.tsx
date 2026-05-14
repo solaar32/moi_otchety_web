@@ -396,7 +396,7 @@ function WorkerHome({ userName }: { userName: string }) {
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[430px_1fr]">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[430px_minmax(0,1fr)]">
           <section className="rounded-[2rem] bg-white p-4 shadow-sm">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
@@ -566,7 +566,7 @@ function WorkerHome({ userName }: { userName: string }) {
             </div>
           </section>
 
-          <section className="space-y-4">
+          <section className="min-w-0 space-y-4 overflow-hidden">
             {latestRows.length > 0 && (
               <div className="rounded-[2rem] bg-white p-4 shadow-sm lg:hidden">
                 <h2 className="mb-3 text-lg font-black">Последние операции</h2>
@@ -624,7 +624,9 @@ function WorkerHome({ userName }: { userName: string }) {
                             <summary className="cursor-pointer p-3 font-bold">
                               {day} — операций: {dayRows.length} — {dayRows.reduce((acc, row) => acc + row.total, 0).toFixed(2)}
                             </summary>
-                            <ReportsTable items={dayRows} showWorker={false} onEdit={editRow} onDelete={deleteRow} />
+                            <div className="max-w-full overflow-x-auto">
+  				<ReportsTable items={dayRows} showWorker={false} onEdit={editRow} onDelete={deleteRow} />
+			    </div>
                           </details>
                         ))}
                     </div>
