@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  Archive,
   BarChart3,
   DatabaseBackup,
   FileSpreadsheet,
@@ -37,6 +38,7 @@ export function AppShell({
   const adminNav = [
     { href: '/admin', label: 'Главная', icon: Home },
     { href: '/admin/reports', label: 'Отчёты', icon: BarChart3 },
+    { href: '/admin/archive', label: 'Архив', icon: Archive },
     { href: '/admin/workers', label: 'Работники', icon: Users },
     { href: '/admin/prices', label: 'Прайс', icon: FileSpreadsheet },
     { href: '/admin/payments', label: 'Выплаты', icon: WalletCards },
