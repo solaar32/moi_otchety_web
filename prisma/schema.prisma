@@ -81,6 +81,8 @@ model ReportItem {
   operationType String?
   operationName String?
   customUnit    String?
+  sectionName  String?
+  unitSnapshot String?
   status        String     @default("PENDING")
   rejectComment String?
 
