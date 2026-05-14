@@ -45,17 +45,11 @@ export function AppShell({
     { href: '/admin/backup', label: 'Backup', icon: DatabaseBackup },
   ];
 
-  const workerNav = [
-    { href: '/worker', label: 'Главная', icon: Home },
-    { href: '/worker', label: 'Добавить', icon: PlusCircle },
-    { href: '/worker', label: 'История', icon: BarChart3 },
-  ];
-
-  const nav = isAdmin ? adminNav : workerNav;
+  const nav = adminNav;
 
   return (
-    <main className="min-h-screen bg-slate-100 pb-20 md:pb-8">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+    <main className="min-h-screen bg-slate-100">
+      <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--brand)] text-sm font-black text-white shadow-sm">
@@ -111,36 +105,7 @@ export function AppShell({
       <footer className="mx-auto hidden max-w-7xl px-4 pt-4 text-center text-xs text-slate-400 md:block">
         Мои отчёты · {APP_VERSION_LABEL}
       </footer>
-
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white md:hidden">
-        <div className="grid grid-cols-4">
-          {nav.slice(0, 4).map((item) => {
-            const Icon = item.icon;
-            const active = pathname === item.href;
-
-            return (
-              <Link
-                key={`mobile-${item.href}-${item.label}`}
-                href={item.href}
-                className={`flex flex-col items-center justify-center gap-1 px-2 py-2 text-[11px] font-bold ${
-                  active ? 'text-[var(--brand)]' : 'text-slate-500'
-                }`}
-              >
-                <Icon size={20} />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-
-          <button
-            onClick={logout}
-            className="flex flex-col items-center justify-center gap-1 px-2 py-2 text-[11px] font-bold text-slate-500"
-          >
-            <LogOut size={20} />
-            <span>Выйти</span>
-          </button>
-        </div>
-      </nav>
+      
     </main>
   );
 }
