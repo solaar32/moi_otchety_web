@@ -10,24 +10,26 @@
     "seed": "node prisma/seed.cjs"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
     "@supabase/supabase-js": "^2.87.1",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "lucide-react": "^0.561.0",
     "next": "^16.0.10",
+    "nodemailer": "^8.0.7",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "xlsx": "^0.18.5",
-    "zod": "^4.2.1",
-    "@prisma/client": "^6.19.3"
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "^24.10.3",
+    "@types/nodemailer": "^8.0.0",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "prisma": "^6.19.3",
     "tailwindcss": "^4.1.18",
-    "typescript": "^5.9.3",
-    "prisma": "^6.19.3"
+    "typescript": "^5.9.3"
   }
 }

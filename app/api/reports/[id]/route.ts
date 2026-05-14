@@ -52,7 +52,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     if (action === 'accept') {
       await prisma.reportItem.update({ where: { id: item.id }, data: { status: 'ACCEPTED', rejectComment: null } });
-      await writeAudit(user, 'ACCEPT_REPORT_ITEM', item.id, `Операция принята: ${item.operationName ?? item.priceItem.name}`);
+      await writeAudit(user, 'ACCEPT_REPORT_ITEM', item.id, `Операция принята: ${item.operationName ?? item.priceItem?.name ?? 'Нестандартная операция'}`);
       return NextResponse.json({ ok: true });
     }
 
@@ -119,7 +119,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
         action: 'DELETE_REPORT_ITEM',
         entityType: 'ReportItem',
         entityId: String(item.id),
-        description: `Удалена операция: ${item.operationName ?? item.priceItem.name}`,
+        description: `Удалена операция: ${item.operationName ?? item.priceItem?.name ?? 'Нестандартная операция'}`,
       },
     });
   });
