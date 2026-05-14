@@ -417,7 +417,7 @@ export default function AdminPaymentsPage() {
                           </button>
                         )}
 
-                        {payment.status !== 'CANCELED' && payment.status !== 'PAID' && (
+                        {payment.status !== 'CANCELED' && (
                           <button
                             className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700"
                             onClick={() => updatePayment(payment.id, 'cancel')}
