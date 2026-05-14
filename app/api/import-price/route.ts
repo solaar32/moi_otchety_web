@@ -261,39 +261,60 @@ export async function POST(request: Request) {
     const version = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
 
     const priceImport = await prisma.$transaction(async (tx) => {
-      await tx.reportItem.deleteMany();
-      await tx.report.deleteMany();
-      await tx.priceItem.deleteMany();
-      await tx.category.deleteMany();
+  for (const section of sections) {
+    const category = await tx.category.upsert({
+      where: { name: section.name },
+      update: { name: section.name },
+      create: { name: section.name },
+    });
 
-      for (const section of sections) {
-        const category = await tx.category.create({ data: { name: section.name } });
-        for (const item of section.items) {
-          await tx.priceItem.create({
-            data: {
-              categoryId: category.id,
-              name: item.name,
-              unit: item.unit || 'шт.',
-              price: item.priceWorker,
-              customerPrice: item.priceCustomer,
-              priceCutPolish: item.priceCutPolish ?? null,
-              priceCut: item.priceCut ?? null,
-              pricePolish: item.pricePolish ?? null,
-            },
-          });
-        }
-      }
-
-      return tx.priceImport.create({
-        data: {
-          fileName: file.name,
-          version,
-          sectionsCount: sections.length,
-          itemsCount: totalItems,
-          uploadedBy: user.login,
+    for (const item of section.items) {
+      const existing = await tx.priceItem.findFirst({
+        where: {
+          categoryId: category.id,
+          name: item.name,
+          unit: item.unit || 'шт.',
         },
       });
-    });
+
+      if (existing) {
+        await tx.priceItem.update({
+          where: { id: existing.id },
+          data: {
+            price: item.priceWorker,
+            customerPrice: item.priceCustomer,
+            priceCutPolish: item.priceCutPolish ?? null,
+            priceCut: item.priceCut ?? null,
+            pricePolish: item.pricePolish ?? null,
+          },
+        });
+      } else {
+        await tx.priceItem.create({
+          data: {
+            categoryId: category.id,
+            name: item.name,
+            unit: item.unit || 'шт.',
+            price: item.priceWorker,
+            customerPrice: item.priceCustomer,
+            priceCutPolish: item.priceCutPolish ?? null,
+            priceCut: item.priceCut ?? null,
+            pricePolish: item.pricePolish ?? null,
+          },
+        });
+      }
+    }
+  }
+
+  return tx.priceImport.create({
+    data: {
+      fileName: file.name,
+      version,
+      sectionsCount: sections.length,
+      itemsCount: totalItems,
+      uploadedBy: user.login,
+    },
+  });
+});
 
     console.log('PRICE_IMPORT', sections.map((s) => `${s.name}: ${s.items.length}`).join(' | '));
     return NextResponse.json({ sections, priceImport });
