@@ -8,21 +8,21 @@ datasource db {
 }
 
 model Worker {
-  id        Int       @id @default(autoincrement())
-  login     String    @unique
+  id        Int     @id @default(autoincrement())
+  login     String  @unique
   password  String
   fullName  String
   email     String?
-  role      Role      @default(WORKER)
-  active    Boolean   @default(true)
+  role      Role    @default(WORKER)
+  active    Boolean @default(true)
 
   reports      Report[]
   paymentLines PaymentLine[]
   auditLogs    AuditLog[]
   resetTokens  PasswordResetToken[]
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Category {
@@ -34,9 +34,9 @@ model Category {
 }
 
 model PriceItem {
-  id          Int          @id @default(autoincrement())
-  categoryId  Int
-  category    Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  id         Int      @id @default(autoincrement())
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   name          String
   unit          String
@@ -53,24 +53,24 @@ model PriceItem {
 }
 
 model Report {
-  id          Int          @id @default(autoincrement())
-  workerId    Int
-  worker      Worker       @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  id       Int    @id @default(autoincrement())
+  workerId Int
+  worker   Worker @relation(fields: [workerId], references: [id], onDelete: Cascade)
 
   orderNumber String
   workDate    DateTime
   total       Float        @default(0)
   items       ReportItem[]
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ReportItem {
-  id          Int        @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  reportId    Int
-  report      Report     @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  reportId Int
+  report   Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
   priceItemId Int?
   priceItem   PriceItem? @relation(fields: [priceItemId], references: [id])
@@ -81,47 +81,53 @@ model ReportItem {
   operationType String?
   operationName String?
   customUnit    String?
+
   sectionName  String?
   unitSnapshot String?
-  status        String     @default("PENDING")
+
+  status        String  @default("PENDING")
   rejectComment String?
 
   paymentLineId Int?
   paymentLine   PaymentLine? @relation(fields: [paymentLineId], references: [id])
 
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Payment {
-  id          Int           @id @default(autoincrement())
-  periodFrom  DateTime
-  periodTo    DateTime
-  status      String        @default("CREATED")
-  total       Float         @default(0)
-  paidAt      DateTime?
-  lines       PaymentLine[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id         Int      @id @default(autoincrement())
+  periodFrom DateTime
+  periodTo   DateTime
+  status     String   @default("CREATED")
+  total      Float    @default(0)
+  paidAt     DateTime?
+
+  archived   Boolean   @default(false)
+  archivedAt DateTime?
+
+  lines     PaymentLine[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 }
 
 model PaymentLine {
-  id          Int          @id @default(autoincrement())
-  paymentId   Int
-  payment     Payment      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  id        Int     @id @default(autoincrement())
+  paymentId Int
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 
-  workerId    Int
-  worker      Worker       @relation(fields: [workerId], references: [id])
-  workerName  String
+  workerId   Int
+  worker     Worker @relation(fields: [workerId], references: [id])
+  workerName String
 
-  worksTotal  Float        @default(0)
-  adjustment  Float        @default(0)
-  finalTotal  Float        @default(0)
-  note        String?
+  worksTotal Float @default(0)
+  adjustment Float @default(0)
+  finalTotal Float @default(0)
+  note       String?
 
-  items       ReportItem[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  items     ReportItem[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 }
 
 model AuditLog {
@@ -147,11 +153,11 @@ model PriceImport {
 }
 
 model LoginAttempt {
-  id        Int      @id @default(autoincrement())
+  id        Int     @id @default(autoincrement())
   login     String
   ip        String?
   userAgent String?
-  success   Boolean  @default(false)
+  success   Boolean @default(false)
   reason    String?
   createdAt DateTime @default(now())
 
@@ -160,11 +166,11 @@ model LoginAttempt {
 }
 
 model PasswordResetToken {
-  id        Int      @id @default(autoincrement())
-  workerId  Int
-  worker    Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  id       Int    @id @default(autoincrement())
+  workerId Int
+  worker   Worker @relation(fields: [workerId], references: [id], onDelete: Cascade)
 
-  tokenHash String   @unique
+  tokenHash String @unique
   ip        String?
   userAgent String?
 
