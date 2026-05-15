@@ -5,8 +5,15 @@ import { getCurrentUser } from '@/lib/current-user';
 
 async function requireAdmin() {
   const user = await getCurrentUser();
-  if (!user) return { error: NextResponse.json({ error: 'Не авторизован' }, { status: 401 }) };
-  if (user.role !== 'admin') return { error: NextResponse.json({ error: 'Нет доступа' }, { status: 403 }) };
+
+  if (!user) {
+    return { error: NextResponse.json({ error: 'Не авторизован' }, { status: 401 }) };
+  }
+
+  if (user.role !== 'admin') {
+    return { error: NextResponse.json({ error: 'Нет доступа' }, { status: 403 }) };
+  }
+
   return { user };
 }
 
@@ -24,6 +31,7 @@ export async function GET() {
       id: true,
       login: true,
       fullName: true,
+      email: true,
       role: true,
       active: true,
       createdAt: true,
@@ -32,10 +40,10 @@ export async function GET() {
   });
 
   return NextResponse.json({
-    workers: workers.map((w) => ({
-      ...w,
-      id: String(w.id),
-      role: w.role.toLowerCase(),
+    workers: workers.map((worker) => ({
+      ...worker,
+      id: String(worker.id),
+      role: worker.role.toLowerCase(),
     })),
   });
 }
@@ -45,8 +53,10 @@ export async function POST(request: Request) {
   if (auth.error) return auth.error;
 
   const body = await request.json().catch(() => null);
+
   const login = String(body?.login ?? '').trim();
   const fullName = String(body?.fullName ?? '').trim();
+  const email = String(body?.email ?? '').trim();
   const password = String(body?.password ?? '').trim();
   const role = normalizeRole(body?.role);
 
@@ -55,17 +65,30 @@ export async function POST(request: Request) {
   }
 
   const exists = await prisma.worker.findUnique({ where: { login } });
-  if (exists) return NextResponse.json({ error: 'Такой логин уже есть' }, { status: 400 });
+
+  if (exists) {
+    return NextResponse.json({ error: 'Такой логин уже есть' }, { status: 400 });
+  }
 
   const worker = await prisma.worker.create({
     data: {
       login,
       fullName,
+      email: email || null,
       password: await bcrypt.hash(password, 10),
       role,
       active: true,
     },
-    select: { id: true, login: true, fullName: true, role: true, active: true, createdAt: true, updatedAt: true },
+    select: {
+      id: true,
+      login: true,
+      fullName: true,
+      email: true,
+      role: true,
+      active: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   });
 
   await prisma.auditLog.create({
@@ -79,5 +102,11 @@ export async function POST(request: Request) {
     },
   });
 
-  return NextResponse.json({ worker: { ...worker, id: String(worker.id), role: worker.role.toLowerCase() } });
+  return NextResponse.json({
+    worker: {
+      ...worker,
+      id: String(worker.id),
+      role: worker.role.toLowerCase(),
+    },
+  });
 }

@@ -10,7 +10,6 @@ import {
   History,
   Home,
   LogOut,
-  PlusCircle,
   ShieldCheck,
   Users,
   WalletCards,
@@ -47,8 +46,6 @@ export function AppShell({
     { href: '/admin/backup', label: 'Backup', icon: DatabaseBackup },
   ];
 
-  const nav = adminNav;
-
   return (
     <main className="min-h-screen bg-slate-100">
       <header className="border-b border-slate-200 bg-white">
@@ -77,37 +74,38 @@ export function AppShell({
           </button>
         </div>
 
-        <nav className="hidden border-t border-slate-100 md:block">
-          <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 py-3 text-sm">
-            {nav.map((item) => {
-              const Icon = item.icon;
-              const active = pathname === item.href;
+        {isAdmin && (
+          <nav className="hidden border-t border-slate-100 md:block">
+            <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 py-3 text-sm">
+              {adminNav.map((item) => {
+                const Icon = item.icon;
+                const active = pathname === item.href;
 
-              return (
-                <Link
-                  key={`${item.href}-${item.label}`}
-                  href={item.href}
-                  className={`flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2 font-bold transition ${
-                    active
-                      ? 'bg-[var(--brand)] text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  <Icon size={16} />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2 font-bold transition ${
+                      active
+                        ? 'bg-[var(--brand)] text-white shadow-sm'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    <Icon size={16} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+        )}
       </header>
 
       <div className="mx-auto max-w-7xl p-4">{children}</div>
 
-      <footer className="mx-auto hidden max-w-7xl px-4 pt-4 text-center text-xs text-slate-400 md:block">
+      <footer className="mx-auto hidden max-w-7xl px-4 pt-4 pb-6 text-center text-xs text-slate-400 md:block">
         Мои отчёты · {APP_VERSION_LABEL}
       </footer>
-      
     </main>
   );
 }
