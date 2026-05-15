@@ -4,8 +4,15 @@ import { getCurrentUser } from '@/lib/current-user';
 
 async function requireAdmin() {
   const user = await getCurrentUser();
-  if (!user) return { error: NextResponse.json({ error: 'Не авторизован' }, { status: 401 }) };
-  if (user.role !== 'admin') return { error: NextResponse.json({ error: 'Нет доступа' }, { status: 403 }) };
+
+  if (!user) {
+    return { error: NextResponse.json({ error: 'Не авторизован' }, { status: 401 }) };
+  }
+
+  if (user.role !== 'admin') {
+    return { error: NextResponse.json({ error: 'Нет доступа' }, { status: 403 }) };
+  }
+
   return { user };
 }
 
@@ -15,16 +22,24 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const action = String(body?.action ?? '');
-  if (action !== 'acceptFiltered') return NextResponse.json({ error: 'Неизвестное действие' }, { status: 400 });
+
+  if (action !== 'acceptFiltered' && action !== 'rejectFiltered') {
+    return NextResponse.json({ error: 'Неизвестное действие' }, { status: 400 });
+  }
 
   const workerName = String(body?.workerName ?? '').trim();
   const section = String(body?.section ?? '').trim();
   const orderNo = String(body?.orderNo ?? '').trim();
   const from = String(body?.from ?? '').trim();
   const to = String(body?.to ?? '').trim();
+  const comment = String(body?.comment ?? '').trim();
 
   if (!workerName) {
-    return NextResponse.json({ error: 'Для массового принятия выберите работника' }, { status: 400 });
+    return NextResponse.json({ error: 'Для массового действия выберите работника' }, { status: 400 });
+  }
+
+  if (action === 'rejectFiltered' && !comment) {
+    return NextResponse.json({ error: 'Для массового отклонения укажите причину' }, { status: 400 });
   }
 
   const where = {
@@ -42,22 +57,35 @@ export async function POST(request: Request) {
           }
         : {}),
     },
-    ...(section ? { priceItem: { category: { name: section } } } : {}),
+    ...(section
+      ? {
+          OR: [
+            { sectionName: section },
+            { priceItem: { category: { name: section } } },
+          ],
+        }
+      : {}),
   };
 
   const result = await prisma.reportItem.updateMany({
     where,
-    data: { status: 'ACCEPTED', rejectComment: null },
+    data:
+      action === 'acceptFiltered'
+        ? { status: 'ACCEPTED', rejectComment: null }
+        : { status: 'REJECTED', rejectComment: comment },
   });
 
   await prisma.auditLog.create({
     data: {
       actorId: Number(auth.user.id),
       actorName: auth.user.name,
-      action: 'BULK_ACCEPT_REPORT_ITEMS',
+      action: action === 'acceptFiltered' ? 'BULK_ACCEPT_REPORT_ITEMS' : 'BULK_REJECT_REPORT_ITEMS',
       entityType: 'ReportItem',
       entityId: 'bulk',
-      description: `Массово принято работ: ${result.count}. Работник: ${workerName}`,
+      description:
+        action === 'acceptFiltered'
+          ? `Массово принято работ: ${result.count}. Работник: ${workerName}`
+          : `Массово отклонено работ: ${result.count}. Работник: ${workerName}. Причина: ${comment}`,
     },
   });
 

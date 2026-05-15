@@ -24,9 +24,10 @@ export default function AdminReportsPage() {
 
   async function loadReports() {
     setLoading(true);
+
     await fetch('/api/reports')
-      .then((r) => r.json())
-      .then((j) => setRows(j.items ?? []))
+      .then((res) => res.json())
+      .then((json) => setRows(json.items ?? []))
       .finally(() => setLoading(false));
   }
 
@@ -34,8 +35,8 @@ export default function AdminReportsPage() {
     loadReports();
   }, []);
 
-  const workers = Array.from(new Set(rows.map((r) => r.workerName))).sort();
-  const sections = Array.from(new Set(rows.map((r) => r.section))).sort();
+  const workers = Array.from(new Set(rows.map((row) => row.workerName))).sort();
+  const sections = Array.from(new Set(rows.map((row) => row.section))).sort();
 
   const items = useMemo(
     () =>
@@ -130,6 +131,54 @@ export default function AdminReportsPage() {
     }
 
     alert(`Принято работ: ${json.count ?? 0}`);
+    await loadReports();
+  }
+
+  async function rejectFilteredByWorker() {
+    if (!worker) {
+      alert('Сначала выберите работника в фильтре');
+      return;
+    }
+
+    const count = items.filter((item) => (item.status ?? 'PENDING') === 'PENDING').length;
+
+    if (count === 0) {
+      alert('По текущему фильтру нет работ на проверке.');
+      return;
+    }
+
+    const comment = prompt(`Причина отклонения для ${count} работ`);
+    if (comment === null) return;
+
+    if (!comment.trim()) {
+      alert('Укажите причину отклонения');
+      return;
+    }
+
+    if (!confirm(`Отклонить все работы по текущему фильтру? Количество: ${count}`)) return;
+
+    const res = await fetch('/api/reports/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'rejectFiltered',
+        workerName: worker,
+        section,
+        orderNo,
+        from,
+        to,
+        comment,
+      }),
+    });
+
+    const json = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      alert(json?.error ?? 'Ошибка массового отклонения');
+      return;
+    }
+
+    alert(`Отклонено работ: ${json.count ?? 0}`);
     await loadReports();
   }
 
@@ -280,9 +329,9 @@ export default function AdminReportsPage() {
             <section className="rounded-[2rem] bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <h2 className="text-xl font-black">Действия</h2>
+                  <h2 className="text-xl font-black">Массовые действия</h2>
                   <p className="text-sm text-slate-500">
-                    Массовое принятие доступно только после выбора работника.
+                    Массовые действия доступны только после выбора работника. Дополнительно можно ограничить фильтр заказом, разделом и периодом.
                   </p>
                 </div>
 
@@ -307,14 +356,22 @@ export default function AdminReportsPage() {
                     onClick={acceptFilteredByWorker}
                     disabled={!worker}
                   >
-                    Принять все по работнику
+                    Принять все по фильтру
+                  </button>
+
+                  <button
+                    className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-black text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={rejectFilteredByWorker}
+                    disabled={!worker}
+                  >
+                    Отклонить все по фильтру
                   </button>
                 </div>
               </div>
 
               {!worker && (
                 <div className="mt-4 rounded-2xl bg-amber-50 p-3 text-sm font-semibold text-amber-800">
-                  Для массового принятия сначала выберите работника в фильтре.
+                  Для массового принятия или отклонения сначала выберите работника.
                 </div>
               )}
             </section>
@@ -331,7 +388,9 @@ export default function AdminReportsPage() {
                 </p>
               </div>
             ) : (
-              <ReportsTable items={items} onAccept={acceptItem} onReject={rejectItem} />
+              <div className="max-w-full overflow-x-auto">
+                <ReportsTable items={items} onAccept={acceptItem} onReject={rejectItem} />
+              </div>
             )}
           </div>
         </AppShell>
