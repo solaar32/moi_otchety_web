@@ -51,7 +51,10 @@ export default function AdminReportsPage() {
     [rows, worker, section, orderNo, from, to],
   );
 
-  const pendingCount = items.filter((item) => (item.status ?? 'PENDING') === 'PENDING').length;
+  const pendingItems = items.filter((item) => (item.status ?? 'PENDING') === 'PENDING');
+  const reviewableItems = items.filter((item) => ['PENDING', 'REJECTED'].includes(item.status ?? 'PENDING'));
+
+  const pendingCount = pendingItems.length;
   const acceptedTotal = statusTotal(items, 'ACCEPTED');
   const paidTotal = statusTotal(items, 'PAID');
   const rejectedCount = items.filter((item) => item.status === 'REJECTED').length;
@@ -79,6 +82,11 @@ export default function AdminReportsPage() {
     const comment = prompt('Причина отклонения', item.rejectComment ?? '');
     if (comment === null) return;
 
+    if (!comment.trim()) {
+      alert('Укажите причину отклонения');
+      return;
+    }
+
     const res = await fetch(`/api/reports/${item.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -97,18 +105,18 @@ export default function AdminReportsPage() {
 
   async function acceptFilteredByWorker() {
     if (!worker) {
-      alert('Сначала выберите работника в фильтре');
+      alert('Сначала выберите работника');
       return;
     }
 
-    const count = items.filter((item) => item.status === 'PENDING' || item.status === 'REJECTED').length;
-
-    if (count === 0) {
+    if (reviewableItems.length === 0) {
       alert('По текущему фильтру нет работ на проверке или отклонённых работ.');
       return;
     }
 
-    if (!confirm(`Принять все работы по текущему фильтру? Количество: ${count}`)) return;
+    if (!confirm(`Принять все работы по текущему фильтру? Количество: ${reviewableItems.length}`)) {
+      return;
+    }
 
     const res = await fetch('/api/reports/bulk', {
       method: 'POST',
@@ -136,18 +144,16 @@ export default function AdminReportsPage() {
 
   async function rejectFilteredByWorker() {
     if (!worker) {
-      alert('Сначала выберите работника в фильтре');
+      alert('Сначала выберите работника');
       return;
     }
 
-    const count = items.filter((item) => (item.status ?? 'PENDING') === 'PENDING').length;
-
-    if (count === 0) {
-      alert('По текущему фильтру нет работ на проверке.');
+    if (pendingItems.length === 0) {
+      alert('По текущему фильтру нет работ со статусом «На проверке».');
       return;
     }
 
-    const comment = prompt(`Причина отклонения для ${count} работ`);
+    const comment = prompt(`Причина отклонения для ${pendingItems.length} работ`);
     if (comment === null) return;
 
     if (!comment.trim()) {
@@ -155,7 +161,9 @@ export default function AdminReportsPage() {
       return;
     }
 
-    if (!confirm(`Отклонить все работы по текущему фильтру? Количество: ${count}`)) return;
+    if (!confirm(`Отклонить все работы по текущему фильтру? Количество: ${pendingItems.length}`)) {
+      return;
+    }
 
     const res = await fetch('/api/reports/bulk', {
       method: 'POST',
@@ -286,20 +294,24 @@ export default function AdminReportsPage() {
               <div className="grid gap-3 md:grid-cols-5">
                 <label className="block space-y-1">
                   <span className="text-sm font-bold text-slate-700">Работник</span>
-                  <select className="input py-3" value={worker} onChange={(e) => setWorker(e.target.value)}>
+                  <select className="input py-3" value={worker} onChange={(event) => setWorker(event.target.value)}>
                     <option value="">Все работники</option>
                     {workers.map((item) => (
-                      <option key={item} value={item}>{item}</option>
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
                     ))}
                   </select>
                 </label>
 
                 <label className="block space-y-1">
                   <span className="text-sm font-bold text-slate-700">Раздел</span>
-                  <select className="input py-3" value={section} onChange={(e) => setSection(e.target.value)}>
+                  <select className="input py-3" value={section} onChange={(event) => setSection(event.target.value)}>
                     <option value="">Все разделы</option>
                     {sections.map((item) => (
-                      <option key={item} value={item}>{item}</option>
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
                     ))}
                   </select>
                 </label>
@@ -310,18 +322,18 @@ export default function AdminReportsPage() {
                     className="input py-3"
                     placeholder="Номер заказа"
                     value={orderNo}
-                    onChange={(e) => setOrderNo(e.target.value)}
+                    onChange={(event) => setOrderNo(event.target.value)}
                   />
                 </label>
 
                 <label className="block space-y-1">
                   <span className="text-sm font-bold text-slate-700">С</span>
-                  <input className="input py-3" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+                  <input className="input py-3" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
                 </label>
 
                 <label className="block space-y-1">
                   <span className="text-sm font-bold text-slate-700">По</span>
-                  <input className="input py-3" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+                  <input className="input py-3" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
                 </label>
               </div>
             </section>
@@ -331,7 +343,7 @@ export default function AdminReportsPage() {
                 <div>
                   <h2 className="text-xl font-black">Массовые действия</h2>
                   <p className="text-sm text-slate-500">
-                    Массовые действия доступны только после выбора работника. Дополнительно можно ограничить фильтр заказом, разделом и периодом.
+                    Массовые действия доступны только после выбора работника. Фильтры по заказу, разделу и периоду учитываются.
                   </p>
                 </div>
 
@@ -354,7 +366,7 @@ export default function AdminReportsPage() {
                   <button
                     className="rounded-2xl bg-[var(--brand)] px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={acceptFilteredByWorker}
-                    disabled={!worker}
+                    disabled={!worker || reviewableItems.length === 0}
                   >
                     Принять все по фильтру
                   </button>
@@ -362,7 +374,7 @@ export default function AdminReportsPage() {
                   <button
                     className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-black text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={rejectFilteredByWorker}
-                    disabled={!worker}
+                    disabled={!worker || pendingItems.length === 0}
                   >
                     Отклонить все по фильтру
                   </button>
@@ -372,6 +384,12 @@ export default function AdminReportsPage() {
               {!worker && (
                 <div className="mt-4 rounded-2xl bg-amber-50 p-3 text-sm font-semibold text-amber-800">
                   Для массового принятия или отклонения сначала выберите работника.
+                </div>
+              )}
+
+              {worker && pendingItems.length === 0 && (
+                <div className="mt-4 rounded-2xl bg-slate-50 p-3 text-sm font-semibold text-slate-600">
+                  По текущему фильтру нет работ со статусом «На проверке» для массового отклонения.
                 </div>
               )}
             </section>
