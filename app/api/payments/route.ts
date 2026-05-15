@@ -35,6 +35,8 @@ export async function GET() {
       status: p.status,
       total: p.total,
       paidAt: p.paidAt ? p.paidAt.toISOString() : null,
+      archived: p.archived,
+      archivedAt: p.archivedAt ? p.archivedAt.toISOString() : null,
       createdAt: p.createdAt.toISOString(),
       lines: p.lines.map((line) => ({
         id: String(line.id),
