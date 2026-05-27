@@ -19,7 +19,7 @@ export async function GET(req: Request) {
   const attempts = await prisma.loginAttempt.findMany({
     where,
     orderBy: { createdAt: 'desc' },
-    take: 500,
+    take: 50,
   });
 
   const since = new Date(Date.now() - 15 * 60 * 1000);
