@@ -44,22 +44,6 @@ function toNumber(value: string) {
   return Number(String(value).replace(',', '.')) || 0;
 }
 
-function statusLabel(status?: string) {
-  if (status === 'ACCEPTED') return 'Принято';
-  if (status === 'REJECTED') return 'Отклонено';
-  if (status === 'IN_PAYMENT') return 'В выплате';
-  if (status === 'PAID') return 'Оплачено';
-  return 'На проверке';
-}
-
-function statusClass(status?: string) {
-  if (status === 'ACCEPTED') return 'bg-emerald-100 text-emerald-700';
-  if (status === 'REJECTED') return 'bg-red-100 text-red-700';
-  if (status === 'IN_PAYMENT') return 'bg-blue-100 text-blue-700';
-  if (status === 'PAID') return 'bg-slate-200 text-slate-700';
-  return 'bg-amber-100 text-amber-700';
-}
-
 export default function WorkerPage() {
   return (
     <RequireUser role="worker">
@@ -81,6 +65,8 @@ function WorkerHome({ userName }: { userName: string }) {
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [categories, setCategories] = useState<PriceCategory[]>([]);
   const [rows, setRows] = useState<ReportItem[]>([]);
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -187,6 +173,25 @@ function WorkerHome({ userName }: { userName: string }) {
     ? numericQty * customPriceNumber
     : numericQty * (selectedPrice ?? 0);
 
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      if (filterFrom && row.reportDate < filterFrom) return false;
+      if (filterTo && row.reportDate > filterTo) return false;
+      return true;
+    });
+  }, [rows, filterFrom, filterTo]);
+
+  function workerExportUrl(format: 'csv' | 'print') {
+    const params = new URLSearchParams();
+
+    if (filterFrom) params.set('from', filterFrom);
+    if (filterTo) params.set('to', filterTo);
+
+    params.set('format', format);
+
+    return `/api/exports/reports?${params.toString()}`;
+  }
+
   async function addRow() {
     setError('');
 
@@ -269,6 +274,7 @@ function WorkerHome({ userName }: { userName: string }) {
     } catch {}
 
     setQty('1');
+
     if (mode === 'custom') {
       setCustomName('');
       setCustomPrice('0');
@@ -353,13 +359,12 @@ function WorkerHome({ userName }: { userName: string }) {
     .reduce((acc, row) => acc + row.total, 0);
 
   const totalAll = rows.reduce((acc, row) => acc + row.total, 0);
-
   const latestRows = rows.slice(0, 5);
 
   const grouped = useMemo(() => {
     const byMonth = new Map<string, Map<string, ReportItem[]>>();
 
-    for (const row of rows) {
+    for (const row of filteredRows) {
       const m = monthKey(row.reportDate);
       if (!byMonth.has(m)) byMonth.set(m, new Map());
 
@@ -369,7 +374,7 @@ function WorkerHome({ userName }: { userName: string }) {
     }
 
     return Array.from(byMonth.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [rows]);
+  }, [filteredRows]);
 
   return (
     <AppShell title="Мои отчёты" role={`Работник: ${userName}`}>
@@ -401,8 +406,9 @@ function WorkerHome({ userName }: { userName: string }) {
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-xl font-black">Новая операция</h2>
-                <p className="text-sm text-slate-500">Быстрое заполнение с телефона</p>
+                <p className="text-sm text-slate-500">Кнопки разделов = листы загруженного прайса</p>
               </div>
+
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
                 {mode === 'custom' ? 'Нестандартная' : 'Прайс'}
               </span>
@@ -431,21 +437,22 @@ function WorkerHome({ userName }: { userName: string }) {
               </label>
 
               <div className="space-y-2">
-                <span className="text-sm font-bold text-slate-700">Раздел</span>
+                <span className="text-sm font-bold text-slate-700">Раздел / лист прайса</span>
+
                 <div className="grid grid-cols-2 gap-2">
-                  {categories.map((s) => (
+                  {categories.map((section) => (
                     <button
-                      key={s.id}
+                      key={section.id}
                       type="button"
-                      onClick={() => chooseSection(s.id)}
+                      onClick={() => chooseSection(section.id)}
                       className={
-                        mode === 'price' && s.id === sectionId
+                        mode === 'price' && section.id === sectionId
                           ? 'rounded-2xl bg-[var(--brand)] px-3 py-3 text-xs font-black text-white'
                           : 'rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs font-bold text-slate-700'
                       }
-                      title={s.name}
+                      title={section.name}
                     >
-                      <span className="line-clamp-2">{s.name}</span>
+                      <span className="line-clamp-2">{section.name}</span>
                     </button>
                   ))}
 
@@ -546,10 +553,12 @@ function WorkerHome({ userName }: { userName: string }) {
                   <span className="text-slate-500">Ед. изм.</span>
                   <b>{mode === 'custom' ? customUnit : selectedItem?.unit ?? '-'}</b>
                 </div>
+
                 <div className="mt-1 flex justify-between">
                   <span className="text-slate-500">Цена</span>
                   <b>{mode === 'custom' ? customPriceNumber : selectedPrice ?? '-'}</b>
                 </div>
+
                 <div className="mt-3 flex justify-between border-t border-slate-200 pt-3 text-lg">
                   <span className="font-bold">Итого</span>
                   <b>{previewTotal.toFixed(2)}</b>
@@ -567,22 +576,86 @@ function WorkerHome({ userName }: { userName: string }) {
           </section>
 
           <section className="min-w-0 space-y-4 overflow-hidden">
+            <div className="rounded-[2rem] bg-white p-4 shadow-sm">
+              <div className="mb-3">
+                <h2 className="text-lg font-black">Период и экспорт</h2>
+                <p className="text-sm text-slate-500">
+                  Выберите период, чтобы отсортировать свои работы и распечатать отчёт.
+                </p>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="block space-y-1">
+                  <span className="text-sm font-bold text-slate-700">С</span>
+                  <input
+                    className="input py-3"
+                    type="date"
+                    value={filterFrom}
+                    onChange={(event) => setFilterFrom(event.target.value)}
+                  />
+                </label>
+
+                <label className="block space-y-1">
+                  <span className="text-sm font-bold text-slate-700">По</span>
+                  <input
+                    className="input py-3"
+                    type="date"
+                    value={filterTo}
+                    onChange={(event) => setFilterTo(event.target.value)}
+                  />
+                </label>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700"
+                  onClick={() => {
+                    setFilterFrom('');
+                    setFilterTo('');
+                  }}
+                >
+                  Сбросить период
+                </button>
+
+                <a
+                  className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700"
+                  href={workerExportUrl('csv')}
+                >
+                  CSV
+                </a>
+
+                <a
+                  className="rounded-2xl bg-[var(--brand)] px-4 py-3 text-sm font-black text-white"
+                  href={workerExportUrl('print')}
+                  target="_blank"
+                >
+                  PDF / печать
+                </a>
+              </div>
+            </div>
+
             {latestRows.length > 0 && (
               <div className="rounded-[2rem] bg-white p-4 shadow-sm lg:hidden">
                 <h2 className="mb-3 text-lg font-black">Последние операции</h2>
+
                 <div className="space-y-2">
                   {latestRows.map((row) => (
                     <div key={row.id} className="rounded-2xl border border-slate-100 p-3">
                       <div className="flex justify-between gap-3">
                         <div>
                           <div className="font-black">Заказ {row.orderNo}</div>
-                          <div className="mt-1 text-sm text-slate-600">{row.operation}</div>
-                          <div className="mt-1 text-xs text-slate-400">{row.qty} {row.unit}</div>
+                          <div className="mt-1 text-sm text-slate-500">{row.operation}</div>
+                          {row.rejectComment && (
+                            <div className="mt-2 rounded-xl bg-red-50 p-2 text-xs font-semibold text-red-700">
+                              Причина: {row.rejectComment}
+                            </div>
+                          )}
                         </div>
+
                         <div className="text-right">
                           <div className="font-black">{row.total.toFixed(2)}</div>
-                          <span className={`mt-1 inline-block rounded-full px-2 py-1 text-[10px] font-black ${statusClass(row.status)}`}>
-                            {statusLabel(row.status)}
+                          <span className="mt-1 inline-block rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">
+                            {row.status ?? 'PENDING'}
                           </span>
                         </div>
                       </div>
@@ -592,47 +665,35 @@ function WorkerHome({ userName }: { userName: string }) {
               </div>
             )}
 
-            <h2 className="text-xl font-black">Мои операции</h2>
-
-            {loading ? (
-              <div className="rounded-[2rem] bg-white p-4 shadow-sm">Загрузка...</div>
-            ) : grouped.length === 0 ? (
+            {filteredRows.length === 0 ? (
               <div className="rounded-[2rem] bg-white p-6 text-center shadow-sm">
-                <div className="text-lg font-black">Операций пока нет</div>
-                <p className="mt-2 text-sm text-slate-500">Добавьте первую операцию через форму слева.</p>
+                <div className="text-xl font-black">Работ за период нет</div>
+                <p className="mt-2 text-sm text-slate-500">
+                  Измените период или добавьте новую операцию.
+                </p>
               </div>
             ) : (
-              grouped.map(([month, days]) => {
-                const monthRows = Array.from(days.values()).flat();
-                const monthTotal = monthRows.reduce((acc, row) => acc + row.total, 0);
+              grouped.map(([m, days]) => (
+                <div key={m} className="rounded-[2rem] bg-white p-4 shadow-sm">
+                  <h2 className="mb-3 text-xl font-black">{monthLabel(m)}</h2>
 
-                return (
-                  <details
-                    key={month}
-                    className="overflow-hidden rounded-[2rem] bg-white shadow-sm"
-                    open={month === monthKey(new Date().toISOString().slice(0, 10))}
-                  >
-                    <summary className="cursor-pointer bg-[var(--brand-soft)] p-4 font-black">
-                      {monthLabel(month)} — {monthTotal.toFixed(2)}
-                    </summary>
+                  <div className="space-y-4">
+                    {Array.from(days.entries())
+                      .sort((a, b) => b[0].localeCompare(a[0]))
+                      .map(([day, dayRows]) => (
+                        <details key={day} className="rounded-3xl border border-slate-100 bg-slate-50 p-3" open>
+                          <summary className="cursor-pointer select-none font-black">
+                            {day} · {dayRows.length} оп. · {dayRows.reduce((acc, row) => acc + row.total, 0).toFixed(2)}
+                          </summary>
 
-                    <div className="space-y-3 p-3">
-                      {Array.from(days.entries())
-                        .sort((a, b) => b[0].localeCompare(a[0]))
-                        .map(([day, dayRows]) => (
-                          <details key={day} className="rounded-2xl border border-slate-200 bg-white" open={day === date}>
-                            <summary className="cursor-pointer p-3 font-bold">
-                              {day} — операций: {dayRows.length} — {dayRows.reduce((acc, row) => acc + row.total, 0).toFixed(2)}
-                            </summary>
-                            <div className="max-w-full overflow-x-auto">
-  				<ReportsTable items={dayRows} showWorker={false} onEdit={editRow} onDelete={deleteRow} />
-			    </div>
-                          </details>
-                        ))}
-                    </div>
-                  </details>
-                );
-              })
+                          <div className="mt-3 max-w-full overflow-x-auto">
+                            <ReportsTable items={dayRows} showWorker={false} onEdit={editRow} onDelete={deleteRow} />
+                          </div>
+                        </details>
+                      ))}
+                  </div>
+                </div>
+              ))
             )}
           </section>
         </div>
