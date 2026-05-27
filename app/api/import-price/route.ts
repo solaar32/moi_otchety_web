@@ -28,12 +28,15 @@ function key(value: string) {
 
 function asNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
+
   if (typeof value === 'string') {
     const normalized = value.replace(/\s/g, '').replace(',', '.');
     if (!normalized || normalized === '-') return null;
+
     const n = Number(normalized);
     return Number.isFinite(n) ? n : null;
   }
+
   return null;
 }
 
@@ -50,11 +53,13 @@ function hasAnyPrice(item: ImportedItem) {
 function fillRight(values: unknown[]) {
   const result: string[] = [];
   let last = '';
+
   for (const value of values) {
     const current = clean(value);
     if (current) last = current;
     result.push(last);
   }
+
   return result;
 }
 
@@ -77,27 +82,28 @@ function sheetToRows(sheet: XLSX.WorkSheet): unknown[][] {
 
   for (let r = range.s.r; r <= range.e.r; r += 1) {
     const row: unknown[] = [];
+
     for (let c = range.s.c; c <= range.e.c; c += 1) {
       const address = XLSX.utils.encode_cell({ r, c });
       const cell = sheet[address];
       row[c - range.s.c] = cell ? (cell.v ?? cell.w ?? null) : null;
     }
+
     rows.push(row);
   }
 
-  // В Excel часть заголовков объединена. Библиотека xlsx хранит значение
-  // только в первой ячейке объединенного диапазона, поэтому заполняем
-  // остальные ячейки вручную. Это критично для листов по степеням и крестам.
   for (const merge of sheet['!merges'] ?? []) {
     const sourceAddress = XLSX.utils.encode_cell({ r: merge.s.r, c: merge.s.c });
     const sourceCell = sheet[sourceAddress];
     const value = sourceCell ? (sourceCell.v ?? sourceCell.w ?? null) : null;
+
     if (value === null || value === undefined || clean(value) === '') continue;
 
     for (let r = merge.s.r; r <= merge.e.r; r += 1) {
       for (let c = merge.s.c; c <= merge.e.c; c += 1) {
         const rr = r - range.s.r;
         const cc = c - range.s.c;
+
         if (rr >= 0 && rr < rows.length && cc >= 0) {
           rows[rr][cc] = rows[rr][cc] ?? value;
         }
@@ -160,9 +166,9 @@ function parseDegreeSheet(rows: unknown[][]): ImportedItem[] {
     .filter((cell) => cell.value.includes('цена для работника'))
     .map((cell) => cell.index);
 
-  // Запасной вариант на случай, если в книге изменятся подписи заголовков:
-  // по этой структуре пары колонок всегда идут как заказчик/работник.
-  const columns = workerCols.length > 0 ? workerCols : [2, 4, 6, 8].filter((index) => index < (rows[1]?.length ?? 0));
+  const columns = workerCols.length > 0
+    ? workerCols
+    : [2, 4, 6, 8].filter((index) => index < (rows[1]?.length ?? 0));
 
   for (const row of rows.slice(2)) {
     const size = clean(row[0]);
@@ -171,14 +177,12 @@ function parseDegreeSheet(rows: unknown[][]): ImportedItem[] {
     for (const workerCol of columns) {
       const customerCol = workerCol - 1;
       const category = header1[customerCol] || header1[workerCol];
-      const priceCustomer = asNumber(row[customerCol]);
-      const priceWorker = asNumber(row[workerCol]);
 
       const item: ImportedItem = {
         name: [size, category].filter(Boolean).join(' — '),
         unit: 'шт.',
-        priceCustomer,
-        priceWorker,
+        priceCustomer: asNumber(row[customerCol]),
+        priceWorker: asNumber(row[workerCol]),
       };
 
       if (hasAnyPrice(item)) result.push(item);
@@ -199,7 +203,9 @@ function parseCrossesSheet(rows: unknown[][]): ImportedItem[] {
     .filter((cell) => cell.value.includes('цена для работника'))
     .map((cell) => cell.index);
 
-  const columns = workerCols.length > 0 ? workerCols : [2, 4, 6, 8, 10, 12].filter((index) => index < (rows[2]?.length ?? 0));
+  const columns = workerCols.length > 0
+    ? workerCols
+    : [2, 4, 6, 8, 10, 12].filter((index) => index < (rows[2]?.length ?? 0));
 
   for (const row of rows.slice(3)) {
     const size = clean(row[0]);
@@ -209,14 +215,12 @@ function parseCrossesSheet(rows: unknown[][]): ImportedItem[] {
       const customerCol = workerCol - 1;
       const group = header1[customerCol] || header1[workerCol];
       const operation = header2[customerCol] || header2[workerCol];
-      const priceCustomer = asNumber(row[customerCol]);
-      const priceWorker = asNumber(row[workerCol]);
 
       const item: ImportedItem = {
         name: [size, group, operation].filter(Boolean).join(' — '),
         unit: 'шт.',
-        priceCustomer,
-        priceWorker,
+        priceCustomer: asNumber(row[customerCol]),
+        priceWorker: asNumber(row[workerCol]),
       };
 
       if (hasAnyPrice(item)) result.push(item);
@@ -228,21 +232,30 @@ function parseCrossesSheet(rows: unknown[][]): ImportedItem[] {
 
 function parseSheet(sheetName: string, rows: unknown[][]): ImportedItem[] {
   const name = key(sheetName);
+
   if (name.includes('декоратив')) return parseDecorative(rows);
   if (name.includes('резка по степен')) return parseDegreeSheet(rows);
   if (name.includes('полировка по степен')) return parseDegreeSheet(rows);
   if (name.includes('крест') && name.includes('резка')) return parseCrossesSheet(rows);
+
   return parseRegularSheet(rows);
 }
 
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 });
-    if (user.role !== 'admin') return NextResponse.json({ error: 'Нет доступа' }, { status: 403 });
+
+    if (!user) {
+      return NextResponse.json({ error: 'Не авторизован' }, { status: 401 });
+    }
+
+    if (user.role !== 'admin') {
+      return NextResponse.json({ error: 'Нет доступа' }, { status: 403 });
+    }
 
     const form = await request.formData();
     const file = form.get('file');
+
     if (!(file instanceof File)) {
       return NextResponse.json({ error: 'Файл не найден' }, { status: 400 });
     }
@@ -254,72 +267,118 @@ export async function POST(request: Request) {
       const sheet = workbook.Sheets[sheetName];
       const rows = sheetToRows(sheet);
       const items = parseSheet(sheetName, rows);
-      return { name: sheetName, items };
-    });
+
+      return {
+        name: sheetName,
+        items,
+      };
+    }).filter((section) => section.items.length > 0);
 
     const totalItems = sections.reduce((sum, section) => sum + section.items.length, 0);
+
+    if (sections.length === 0 || totalItems === 0) {
+      return NextResponse.json({ error: 'В файле не найдено позиций прайса' }, { status: 400 });
+    }
+
     const version = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
 
     const priceImport = await prisma.$transaction(async (tx) => {
-  for (const section of sections) {
-    const category = await tx.category.upsert({
-      where: { name: section.name },
-      update: { name: section.name },
-      create: { name: section.name },
-    });
+      await tx.priceItem.updateMany({
+        data: { active: false },
+      });
 
-    for (const item of section.items) {
-      const existing = await tx.priceItem.findFirst({
-        where: {
-          categoryId: category.id,
-          name: item.name,
-          unit: item.unit || 'шт.',
+      await tx.category.updateMany({
+        data: { active: false },
+      });
+
+      for (const section of sections) {
+        const category = await tx.category.upsert({
+          where: { name: section.name },
+          update: {
+            name: section.name,
+            active: true,
+          },
+          create: {
+            name: section.name,
+            active: true,
+          },
+        });
+
+        for (const item of section.items) {
+          const existing = await tx.priceItem.findFirst({
+            where: {
+              categoryId: category.id,
+              name: item.name,
+              unit: item.unit || 'шт.',
+            },
+          });
+
+          if (existing) {
+            await tx.priceItem.update({
+              where: { id: existing.id },
+              data: {
+                active: true,
+                price: item.priceWorker,
+                customerPrice: item.priceCustomer,
+                priceCutPolish: item.priceCutPolish ?? null,
+                priceCut: item.priceCut ?? null,
+                pricePolish: item.pricePolish ?? null,
+              },
+            });
+          } else {
+            await tx.priceItem.create({
+              data: {
+                categoryId: category.id,
+                name: item.name,
+                unit: item.unit || 'шт.',
+                active: true,
+                price: item.priceWorker,
+                customerPrice: item.priceCustomer,
+                priceCutPolish: item.priceCutPolish ?? null,
+                priceCut: item.priceCut ?? null,
+                pricePolish: item.pricePolish ?? null,
+              },
+            });
+          }
+        }
+      }
+
+      const createdImport = await tx.priceImport.create({
+        data: {
+          fileName: file.name,
+          version,
+          sectionsCount: sections.length,
+          itemsCount: totalItems,
+          uploadedBy: user.login,
         },
       });
 
-      if (existing) {
-        await tx.priceItem.update({
-          where: { id: existing.id },
-          data: {
-            price: item.priceWorker,
-            customerPrice: item.priceCustomer,
-            priceCutPolish: item.priceCutPolish ?? null,
-            priceCut: item.priceCut ?? null,
-            pricePolish: item.pricePolish ?? null,
-          },
-        });
-      } else {
-        await tx.priceItem.create({
-          data: {
-            categoryId: category.id,
-            name: item.name,
-            unit: item.unit || 'шт.',
-            price: item.priceWorker,
-            customerPrice: item.priceCustomer,
-            priceCutPolish: item.priceCutPolish ?? null,
-            priceCut: item.priceCut ?? null,
-            pricePolish: item.pricePolish ?? null,
-          },
-        });
-      }
-    }
-  }
+      await tx.auditLog.create({
+        data: {
+          actorId: Number(user.id),
+          actorName: user.name,
+          action: 'IMPORT_PRICE',
+          entityType: 'PriceImport',
+          entityId: String(createdImport.id),
+          description: `Загружен новый прайс: ${file.name}. Разделов: ${sections.length}, позиций: ${totalItems}`,
+        },
+      });
 
-  return tx.priceImport.create({
-    data: {
-      fileName: file.name,
-      version,
-      sectionsCount: sections.length,
-      itemsCount: totalItems,
-      uploadedBy: user.login,
-    },
-  });
-});
+      return createdImport;
+    });
 
     console.log('PRICE_IMPORT', sections.map((s) => `${s.name}: ${s.items.length}`).join(' | '));
-    return NextResponse.json({ sections, priceImport });
+
+    return NextResponse.json({
+      sections,
+      priceImport,
+    });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Ошибка импорта' }, { status: 500 });
+
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Ошибка импорта' },
+      { status: 500 },
+    );
   }
 }

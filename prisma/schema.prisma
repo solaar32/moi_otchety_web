@@ -28,6 +28,7 @@ model Worker {
 model Category {
   id        Int         @id @default(autoincrement())
   name      String      @unique
+  active    Boolean     @default(true)
   items     PriceItem[]
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
@@ -40,6 +41,7 @@ model PriceItem {
 
   name          String
   unit          String
+  active        Boolean @default(true)
   price         Float?
   customerPrice Float?
 

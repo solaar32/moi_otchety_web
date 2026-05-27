@@ -7,8 +7,14 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 });
 
   const categories = await prisma.category.findMany({
+    where: { active: true },
     orderBy: { id: 'asc' },
-    include: { items: { orderBy: { id: 'asc' } } },
+    include: {
+      items: {
+        where: { active: true },
+        orderBy: { id: 'asc' },
+      },
+    },
   });
 
   return NextResponse.json({
