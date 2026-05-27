@@ -13,6 +13,41 @@ function statusTotal(items: ReportItem[], status: string) {
     .reduce((acc, item) => acc + item.total, 0);
 }
 
+function reportPeriodKey(date: string) {
+  const [yearRaw, monthRaw, dayRaw] = date.split('-');
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+
+  if (day >= 10 && day < 25) {
+    return `${yearRaw}-${monthRaw}-10`;
+  }
+
+  if (day >= 25) {
+    return `${yearRaw}-${monthRaw}-25`;
+  }
+
+  const previous = new Date(Date.UTC(year, month - 2, 25));
+  return `${previous.toISOString().slice(0, 7)}-25`;
+}
+
+function reportPeriodLabel(key: string) {
+  const [yearRaw, monthRaw, startRaw] = key.split('-');
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const start = Number(startRaw);
+
+  if (start === 10) {
+    return `Период с 10 по 25 · ${monthRaw}.${yearRaw}`;
+  }
+
+  const next = new Date(Date.UTC(year, month, 10));
+  const nextYearMonth = next.toISOString().slice(0, 7);
+  const [nextYear, nextMonth] = nextYearMonth.split('-');
+
+  return `Период с 25 по 10 · ${monthRaw}.${yearRaw} — ${nextMonth}.${nextYear}`;
+}
+
 export default function AdminReportsPage() {
   const [worker, setWorker] = useState('');
   const [orderNo, setOrderNo] = useState('');
@@ -50,6 +85,18 @@ export default function AdminReportsPage() {
       }),
     [rows, worker, section, orderNo, from, to],
   );
+
+  const groupedByPeriod = useMemo(() => {
+    const map = new Map<string, ReportItem[]>();
+
+    for (const item of items) {
+      const key = reportPeriodKey(item.reportDate);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(item);
+    }
+
+    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [items]);
 
   const pendingItems = items.filter((item) => (item.status ?? 'PENDING') === 'PENDING');
   const reviewableItems = items.filter((item) => ['PENDING', 'REJECTED'].includes(item.status ?? 'PENDING'));
@@ -225,7 +272,7 @@ export default function AdminReportsPage() {
                   </h1>
 
                   <p className="mt-2 max-w-3xl text-sm text-slate-500">
-                    Фильтруйте операции, принимайте работы, отклоняйте ошибки и готовьте принятые работы к выплате.
+                    Работы сгруппированы по расчётным периодам: с 10 по 25 и с 25 по 10.
                   </p>
                 </div>
 
@@ -343,7 +390,7 @@ export default function AdminReportsPage() {
                 <div>
                   <h2 className="text-xl font-black">Массовые действия</h2>
                   <p className="text-sm text-slate-500">
-                    Массовые действия доступны только после выбора работника. Фильтры по заказу, разделу и периоду учитываются.
+                    Для массового принятия или отклонения сначала выберите работника.
                   </p>
                 </div>
 
@@ -380,18 +427,6 @@ export default function AdminReportsPage() {
                   </button>
                 </div>
               </div>
-
-              {!worker && (
-                <div className="mt-4 rounded-2xl bg-amber-50 p-3 text-sm font-semibold text-amber-800">
-                  Для массового принятия или отклонения сначала выберите работника.
-                </div>
-              )}
-
-              {worker && pendingItems.length === 0 && (
-                <div className="mt-4 rounded-2xl bg-slate-50 p-3 text-sm font-semibold text-slate-600">
-                  По текущему фильтру нет работ со статусом «На проверке» для массового отклонения.
-                </div>
-              )}
             </section>
 
             {loading ? (
@@ -406,9 +441,26 @@ export default function AdminReportsPage() {
                 </p>
               </div>
             ) : (
-              <div className="max-w-full overflow-x-auto">
-                <ReportsTable items={items} onAccept={acceptItem} onReject={rejectItem} />
-              </div>
+              <section className="space-y-4">
+                {groupedByPeriod.map(([periodKey, periodItems]) => (
+                  <details key={periodKey} className="rounded-[2rem] bg-white p-5 shadow-sm" open>
+                    <summary className="cursor-pointer select-none">
+                      <div className="inline-flex flex-col">
+                        <span className="text-xl font-black text-slate-900">
+                          {reportPeriodLabel(periodKey)}
+                        </span>
+                        <span className="mt-1 text-sm text-slate-500">
+                          Работ: {periodItems.length} · сумма: {periodItems.reduce((acc, item) => acc + item.total, 0).toFixed(2)}
+                        </span>
+                      </div>
+                    </summary>
+
+                    <div className="mt-4 max-w-full overflow-x-auto">
+                      <ReportsTable items={periodItems} onAccept={acceptItem} onReject={rejectItem} />
+                    </div>
+                  </details>
+                ))}
+              </section>
             )}
           </div>
         </AppShell>
